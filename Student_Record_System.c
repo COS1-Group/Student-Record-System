@@ -17,6 +17,9 @@ void validate_input(char *prompt, char *datatype, void *target, int *user_choice
 int get_user_choice();
 
 int main() {
+    /*
+        This is the main function that runs the entire program.
+    */
     clear_terminal(); // Clear the terminal and print logo
 
     char user_name[MAX_NAME_CHARS];
@@ -35,6 +38,10 @@ int main() {
 }
 
 void print_logo() {
+    /*
+        This function prints the program's logo from a file named
+        logo.txt.
+    */
     char line[256];  // Store each line of the file in a string
     FILE *inFile;
 
@@ -63,6 +70,17 @@ void print_logo() {
 }
 
 void clear_terminal() {
+    /*
+        This function clears the terminal console using the expression
+        printf("\e[1;1H\e[2J").
+
+        Basically:
+            - \e is the escape character in ASCII.
+            - [1;1H is an escape sequence that moves the cursor to row 1, column 1 (the top-left corner of the screen).
+            - [2J is an escape sequence that clears the entire screen.
+
+        So by saying printf("\e[1;1H\e[2J"), we tell the terminal to move the cursor to the top-left corner and clear the screen.
+    */
     printf("\e[1;1H\e[2J"); 
     print_logo();
 }
@@ -75,11 +93,20 @@ void convert_to_upper(char *str){
 }
 
 void get_user_name(char *user_name) {
+    
     printf("\n--> Enter your name to proceed: ");
     scanf("%s", user_name);
 }
 
 void validate_input(char *prompt, char *datatype, void *target, int *user_choice_input, int len_input) {
+    /*
+        This function validates that the user entry is valid for the options provided.
+        For example, if the user is asked to select options from 1, 2, 3, 4, this function ensures
+        that the user entry is within the allowable options.
+
+        also, if the available options is {y,n}, this function ensures
+        that the user entry is within the allowable options.
+    */
     bool is_valid_userchoice = false;
     char user_input[100]; // Buffer to store user input
     // printf("lenin: %d",len_input);
@@ -128,6 +155,11 @@ void validate_input(char *prompt, char *datatype, void *target, int *user_choice
 
 
 int get_user_choice() {
+    /*
+        This function returns the operation number the user wants to perform.
+        If they choose, 1, it means they want to add a student, if the choose 2, they want to update a record, and so on
+    */
+
     int userselection;
     int options[] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
     int len_options = sizeof(options) / sizeof(options[0]);
@@ -153,6 +185,5 @@ int get_user_choice() {
     
     // Validate and get the user input
     validate_input(option_art, "integer", options, &userselection, len_options);
-
     return userselection;
 }
