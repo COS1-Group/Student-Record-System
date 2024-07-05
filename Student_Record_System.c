@@ -503,5 +503,5 @@ void add_student(struct Student **students_array, int *student_count) {
     if (repeat_action("add",&go_again)){
         add_student(students_array,student_count);
     }
-    //auto_sort_save_record(*students_array, *student_count); // Sort and save student records
+    //auto_sort_save_record(*students_array, *student_count); // Sort and save student records(coming soon...)
 }
