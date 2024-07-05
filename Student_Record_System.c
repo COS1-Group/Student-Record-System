@@ -15,6 +15,7 @@
 #define TOTAL_SCORE 100
 
 const char *LOGO_FILE_NAME = "logo.txt";
+char YES_NO_OPTIONS[] = { 'y','n'};
 
 // Enum for data types
 enum DataType {
@@ -176,7 +177,7 @@ void validate_input_choices(char *prompt, enum DataType type, void *target, int 
 
     while (!is_valid_userchoice) {
         printf("%s", prompt);
-        scanf(" %s", user_input); // Read user input as a string
+        scanf("%s", user_input); // Read user input as a string
         
         if (type == INTEGER) {
             target_string = "integer";
@@ -228,6 +229,23 @@ void show_error_art(char *msg){
     printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
 }
 
+bool is_alphanumeric_or_alphabetic(const char *str) {
+    bool has_alpha = false;
+    bool has_digit = false;
+
+    for (int i = 0; str[i] != '\0'; i++) {
+        if (isalpha(str[i])) {
+            has_alpha = true;
+        } else if (isdigit(str[i])) {
+            has_digit = true;
+        } else {
+            return false; // Contains non-alphanumeric character
+        }
+    }
+    return has_alpha; // Return true if the string has at least one alphabetic character
+}
+
+
 /**
  * @brief Validates user input based on the specified data type.
  *
@@ -237,14 +255,15 @@ void show_error_art(char *msg){
  * @param max_length Maximum length allowed for strings (0 for other types).
  * @param min_length Minimum length required for strings (0 for other types).
  */
+
 void validate_input_data(const char *prompt, void *input_buffer, enum DataType type, int max_length, int min_length) {
     bool valid = false;
     char buffer[256];
     float score;
+    char error_msg[MAX_STRING_LEN * 2];
 
     while (!valid) {
         printf("%s", prompt);
-        char error_msg[ART_SIZE];
         fgets(buffer, sizeof(buffer), stdin);
 
         // Remove newline character if present
@@ -252,48 +271,49 @@ void validate_input_data(const char *prompt, void *input_buffer, enum DataType t
 
         switch (type) {
             case STRING:
-                // Validate string length
-                if (strlen(buffer) >= min_length && strlen(buffer) <= max_length) {
+                // Validate string length and content
+                if (strlen(buffer) >= min_length && strlen(buffer) <= max_length && is_alphanumeric_or_alphabetic(buffer)) {
                     strncpy((char *)input_buffer, buffer, max_length); // Copy up to max_length characters
                     valid = true;
                 } else {
-                    sprintf(error_msg,"Please enter a string with length between %d and %d characters\n", min_length, max_length);
+                    sprintf(error_msg,"           Please enter a string with length between %d and %d, \n           containing only alphabetic or alphanumeric characters",MIN_STRING_LEN,MAX_STRING_LEN);
+                    show_error_art(error_msg);
                 }
                 break;
+
             case INTEGER:
                 // Validate integer input
                 if (sscanf(buffer, "%d", (int *)input_buffer) == 1) {
                     valid = true;
                 } else {
-                    strcat(error_msg,"                   Please enter a valid integer                    \n");
+                    show_error_art("Please enter a valid integer");
                 }
                 break;
+
             case FLOAT:
                 // Validate float input
                 if (sscanf(buffer, "%f", (float *)input_buffer) == 1) {
                     valid = true;
                 } else {
-                    strcat(error_msg,"                  Please enter a valid float number                  \n");
+                    show_error_art("Please enter a valid float number");
                 }
                 break;
+
             case SCORE:
                 // Validate score input (numeric and within range)
-            
                 if (sscanf(buffer, "%f", &score) == 1 && score <= TOTAL_SCORE) {
                     *(float *)input_buffer = score;
                     valid = true;
                 } else {
-                    sprintf(error_msg,"   Please enter a numerical value less than or equal to %d   \n",TOTAL_SCORE);
+                    sprintf(error_msg,"Please enter a numerical value less than or equal to %d",TOTAL_SCORE);
+                    show_error_art(error_msg);
                 }
                 break;
+
             default:
                 // Invalid input type
                 printf("!!!Invalid input type!!!\n");
                 return;
-        }
-        if (!valid) {
-            printf("%d",valid);
-            show_error_art(error_msg);
         }
     }
 }
@@ -340,10 +360,12 @@ int get_main_program_choice() {
  * 
  * @param current_student_roll The current roll number in the student array being checked.
  */
-bool is_duplicate_roll_num(int current_student_roll) {
+bool is_duplicate_roll_num( int current_student_roll) {
     if (student_count > 0) {
         for (int i = 0; i < student_count; i++) {
-            return students[i].roll_number == current_student_roll;
+            if (students[i].roll_number == current_student_roll){
+                return true;
+            }
         }
     }
     return false;
@@ -357,12 +379,37 @@ bool is_duplicate_roll_num(int current_student_roll) {
  * @param selected_student Pointer to the structure of a student in the entire student array.
  * @param course_name the name of the current course being checked.
  */
-bool is_duplicate_course(struct Student *selected_student, char course_name[MAX_STRING_LEN]){
-    for (int i = 0; i < MAX_COURSES; i++){
-        return strcmp(selected_student->courses[i], course_name)==0;
+bool is_duplicate_course(struct Student *selected_student, char course_name[MAX_STRING_LEN]) {
+    for (int i = 0; i < MAX_COURSES; i++) {
+        if (strcmp(selected_student->courses[i], course_name) == 0) {
+            return true; // Found a duplicate course
+        }
     }
-    return false;
+    return false; // No duplicates found
 }
+
+/**
+ * @brief Checks if the user wants to repeat an action.
+ * 
+ * This function prompts the user to enter 'Y' or 'N' to repeat an action.
+ * 
+ * @param action The action description to display in the prompt.
+ * @param response Pointer to where the user's response ('Y' or 'N') will be stored.
+ * @return true if the user wants to repeat the action, false otherwise.
+ */
+bool repeat_action(char *action, int *response) {
+    char prompt[MAX_STRING_LEN + 50];
+    sprintf(prompt, " -> Do you want to %s another record? Y/N: ", action);
+
+    // Validate user input for 'Y' or 'N'
+    validate_input_choices(prompt, STRING, YES_NO_OPTIONS, response, sizeof(YES_NO_OPTIONS));
+
+    // Convert response to lowercase for consistency
+    *response = tolower(*response);
+
+    return *response == 'y';
+}
+
 
 /**
  * @brief Adds a new student to the students record array.
@@ -376,11 +423,12 @@ bool is_duplicate_course(struct Student *selected_student, char course_name[MAX_
  * @param student_count Pointer to the count of students currently in the system.
  */
 void add_student(struct Student **students_array, int *student_count) {
-    bool duplicate_roll = false;    // Flag to check for duplicate roll numbers
+    bool duplicate_roll;    // Flag to check for duplicate roll numbers
     bool duplicate_course = false;  // Flag to check for duplicate course names
     int total_score = 0;            // Accumulator for total score of courses
     char course_name[MAX_STRING_LEN];  // Buffer to store course name during input
     char sen[MAX_STRING_LEN + 50];   // Buffer for constructing prompts
+    int go_again;
 
     // Allocate or reallocate memory for students_array array
     if (*student_count == 0) {
@@ -406,10 +454,11 @@ void add_student(struct Student **students_array, int *student_count) {
 
     // Check for duplicate roll number and prompt until unique
     while (true) {
+
         snprintf(sen, sizeof(sen), "--> Enter %s's roll number: ", new_student->name);
         validate_input_data(sen, &new_student->roll_number, INTEGER, sizeof(int), 0);
-        //duplicate_roll = is_duplicate_roll_num(*students_array, *student_count, new_student->roll_number);
-        if (!is_duplicate_roll_num(new_student->roll_number)) {
+        duplicate_roll = is_duplicate_roll_num(new_student->roll_number);
+        if (!duplicate_roll) {
             break;
         }
         printf("!!! A student with this roll number already exists. Please enter a unique roll number.\n");
@@ -422,10 +471,12 @@ void add_student(struct Student **students_array, int *student_count) {
     for (int i = 0; i < MAX_COURSES; i++) {
         // Prompt and validate course name, ensure it is unique
         while (true) {
+            duplicate_roll = true;
             snprintf(sen, sizeof(sen), "--> Enter course name for course %d: ", i + 1);
             validate_input_data(sen, course_name, STRING, MAX_STRING_LEN, MIN_STRING_LEN);
-            //duplicate_course = is_duplicate_course(new_student, course_name);
-            if (!is_duplicate_course(new_student, course_name)) {
+            duplicate_course = is_duplicate_course(new_student, course_name);
+            printf("%d",duplicate_course);
+            if (!duplicate_course) {
                 strncpy(new_student->courses[i], course_name, MAX_STRING_LEN);
                 break;
             }
@@ -448,5 +499,9 @@ void add_student(struct Student **students_array, int *student_count) {
 
     // Increment student count and save record
     (*student_count)++;
+
+    if (repeat_action("add",&go_again)){
+        add_student(students_array,student_count);
+    }
     //auto_sort_save_record(*students_array, *student_count); // Sort and save student records
 }
