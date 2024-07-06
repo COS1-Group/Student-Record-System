@@ -58,7 +58,7 @@ void add_student(struct Student **students_array, int *student_count);
 void display_all_students();
 void display_student_info(struct Student *student, int student_index);
 int get_main_program_choice();
-int search_by_roll();
+int search_by_roll(char *purpose);
 void clear_input_buffer() ;
 void show_found_student();
 
@@ -674,15 +674,21 @@ void display_student_info(struct Student *student, int student_index) {
  * of available students to find a match. It prints a visual indication of progress
  * while searching and returns the index of the student if found, otherwise returns -1.
  * 
+ * @param purpose The reason why we are searching. This is necessary because when we want to
+ * modify or delete a record, we have to first search for that record by roll number, hence, this function can be 
+ * reused for those other purposes
+ * 
  * @return int Index of the student in the array if found, -1 if not found or no students available.
  */
-int search_by_roll() {
+int search_by_roll(char *purpose) {
     if (student_count > 0) {
         int roll_num_to_search;
         char *error_msg;
+        char prompt[MAX_STRING_LEN];
         
         // Prompt user for roll number input
-        validate_input_data("\n--> Enter the roll number to search for: ", &roll_num_to_search, INTEGER, 0, 0);
+        sprintf(prompt,"\n--> Enter the roll number to %s: ",purpose);
+        validate_input_data(prompt, &roll_num_to_search, INTEGER, 0, 0);
         
         printf("\n<<<<<<<<-- Please wait while I query the database: "); // Print initial message
 
@@ -724,7 +730,7 @@ void show_found_student() {
     header_msg = "@@                 ---< SEARCHING FOR A STUDENT BY ROLL NUMBER >---               @@";
     clear_terminal();
     show_header_art(header_msg);
-    int student_index = search_by_roll();
+    int student_index = search_by_roll("search for");
     if (student_index != -1) {
         struct Student *found_student = &(students[student_index]);
         display_student_info(found_student, student_index);
