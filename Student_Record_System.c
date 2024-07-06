@@ -9,7 +9,7 @@
 
 
 #define MAX_STRING_LEN 100 // maximum length of a person's name
-#define MAX_ERROR_MSG_LEN 256
+#define MAX_MSG_LEN 256
 #define MIN_STRING_LEN 5 
 #define ART_SIZE 1262
 #define TOTAL_SCORE 100
@@ -42,7 +42,7 @@ struct Student {
 //Global variables
 struct Student *students = NULL;
 int student_count = 0;
-
+bool greet_user = true;
 // Function prototypes
 bool repeat_action(char *action, int *response);
 void clear_terminal();
@@ -83,7 +83,7 @@ int main() {
     {
         int selected_operation = get_main_program_choice();
         // printf("Selected option %d\n", selected_operation);
-
+        greet_user = false;
         switch (selected_operation)
         {
             case 1:
@@ -260,7 +260,7 @@ void validate_input_choices(char *prompt, enum DataType type, void *target, int 
 
         if (!is_valid_userchoice) {
             clear_terminal();
-            char error_msg[MAX_ERROR_MSG_LEN - 156];
+            char error_msg[MAX_MSG_LEN - 156];
             sprintf(error_msg,"!!!      Please enter a valid %s from the options provided         !!!",target_string);
             show_error_art(error_msg);
 
@@ -323,7 +323,7 @@ void validate_input_data(const char *prompt, void *input_buffer, enum DataType t
     bool valid = false;
     char buffer[256];
     float score;
-    char error_msg[MAX_ERROR_MSG_LEN];
+    char error_msg[MAX_MSG_LEN];
 
     while (!valid) {
         printf("%s", prompt);
@@ -395,7 +395,9 @@ int get_main_program_choice() {
     char option_art[ART_SIZE];
     // printf("len opt: %d", len_options);
     // Store the ASCII art in the buffer
-    clear_terminal();
+    if(!greet_user){
+        clear_terminal();
+    }
     sprintf(option_art,
         "\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n"
         "@@                                                                                @@\n"
@@ -617,7 +619,7 @@ void display_all_students() {
         show_no_data_err("display");
         return;
     }
-    header_msg = "@@                  ----< DISPLAYING ALL THE STUDENTS RECORD >----                 n@@";
+    header_msg = "@@                  ----< DISPLAYING ALL THE STUDENTS RECORD >----                 @@";
     show_header_art(header_msg);
     printf("\n");
     for (int i = 0; i < student_count; i++) {
@@ -631,23 +633,14 @@ void display_all_students() {
 /**
  * @brief Display information of a single student in a formatted way.
  *This is what the format mean ( please note that the formatting not perfect and may change depending on the actual value of variables):
+    %-25c:
+        %-: Left-align the string in the given field.
+        25: Minimum field width of 15 characters.
+        s: Format as a character.
     %-15s:
         %-: Left-align the string in the given field.
         15: Minimum field width of 15 characters.
         s: Format as a string.
-    %-10.2f:
-        %-: Left-align the number in the given field.
-        10: Minimum field width of 10 characters.
-        .2: Display 2 digits after the decimal point.
-        f: Format as a floating-point number.
-    %-50s:
-        %-: Left-align the string in the given field.
-        50: Minimum field width of 50 characters.
-        s: Format as a string.
-    %-50d:
-        %-: Left-align the number in the given field.
-        50: Minimum field width of 50 characters.
-        d: Format as an integer.
  * 
  * @param student Pointer to the student structure.
  * @param student_index Index of the student in the array.
@@ -657,19 +650,19 @@ void display_student_info(struct Student *student, int student_index) {
     printf("\n================================================================================\n");
     printf("                          STUDENT %d: %s                          \n", student_index + 1, student->name);
     printf("================================================================================\n");
-    printf("| %-15s: %-50s |\n", "Department", student->department);
-    printf("| %-15s: %-50d |\n", "Roll Number", student->roll_number);
+    printf("%-25c  %-15s: %s \n", ' ',"Department", student->department);
+    printf("%-25c  %-15s: %d \n", ' ',"Roll Number", student->roll_number);
     printf("================================================================================\n");
-    printf("                               COURSES AND SCORES                               \n");
+    printf("                           COURSES AND SCORES                               \n");
     printf("--------------------------------------------------------------------------------\n");
 
     for (int j = 0; j < MAX_COURSES; j++) {
-        printf("| %-45s : %-10.2f |\n", student->courses[j], student->scores[j]);
+        printf("%-25c  %-15s : %.2f \n", ' ',student->courses[j], student->scores[j]);
     }
 
     printf("--------------------------------------------------------------------------------\n");
-    printf("| %-15s: %-10.2f                                    \n", "Average", student->average);
-    printf("| %-15s: %-50s \n", "Grade", student->grade);
+    printf("%-25c  %-15s: %.2f \n", ' ',"Average", student->average);
+    printf("%-25c  %-15s: %s \n", ' ',"Grade", student->grade);
     printf("================================================================================\n");
 }
 
@@ -757,10 +750,16 @@ void show_found_student() {
  * @param totalnum_of_students Pointer to the total number of students.
  */
 void modify_student_data() {
+    char *error_msg,*header_msg;
+    int update_options[] = {1,2,3,4,5,6};
+    int modify_again;
+
+    header_msg = "@@                 ----< MODIFYING A STUDENT'S RECORD >----                       @@";
+    clear_terminal();
+    show_header_art(header_msg);
+    
     // Find student by roll number
     int student_index = search_by_roll("modify");
-    char *error_msg;
-    int update_options[] = {1,2,3,4,5,6};
     if (student_index != -1) {
         struct Student *student = &(students[student_index]);
         // Display student information
@@ -769,7 +768,7 @@ void modify_student_data() {
         // Get user choice for modification
         int choice;
         char option_art[ART_SIZE];
-
+        
         sprintf(option_art,
         "\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n"
         "@@                                                                                @@\n"
@@ -783,10 +782,6 @@ void modify_student_data() {
         "@@                            6. Exit                                             @@\n"
         "@@                                                                                @@\n"
         "           --> Please type a number to select an option from above: ");
-        // printf("\nWhat would you like to change?\n");
-        // printf("1. Name\n2. Department\n3. Roll number\n4. Course name\n5. Course score\n");
-        // printf("Enter a number to choose an option: ");
-        // scanf("%d", &choice);
         validate_input_choices(option_art,INTEGER,update_options,&choice,sizeof(update_options)/sizeof(update_options[0]));
 
         // Update based on user choice
@@ -825,6 +820,9 @@ void modify_student_data() {
                 break;
         }
         
+        if (repeat_action("modify a record again",&modify_again)){
+            modify_student_data();
+        }
     } 
 }
 
@@ -837,26 +835,35 @@ void modify_student_data() {
 void update_course(struct Student *student, bool update_name) {
     int course_num;
     int course_options[] = {1,2,3};
+    char *header_msg;
+    char prompt[MAX_MSG_LEN];
+
     // Display courses and their scores
-    printf("Choose a course to update:\n");
-    for (int i = 0; i < MAX_COURSES; i++) {
-        printf("%d. %s: %.2f\n", i + 1, student->courses[i], student->scores[i]);
+    header_msg = "@@                  ----< SELECT THE COURSE TO UPDATE >----                        @@\n";
+    clear_terminal();
+    printf("\n====================================================================================\n");
+    printf("                                 COURSES AND SCORES                                  \n");
+    printf("-------------------------------------------------------------------------------------\n");
+    show_header_art(header_msg);
+    printf("\n");
+    for (int j = 0; j < MAX_COURSES; j++) {
+        printf("%-25c %d. %-15s : %-15.2f \n", ' ', j + 1,student->courses[j], student->scores[j]);
     }
-    // }
-    // printf("Enter a number: ");
-    // scanf("%d", &course_num);
-    validate_input_choices("\n--> Enter a number: ",INTEGER,course_options,&course_num,sizeof(course_options)/sizeof(course_options[0]));
+    
+    validate_input_choices( "\n--> Please type a number to select an option from above: ",INTEGER,course_options,&course_num,sizeof(course_options)/sizeof(course_options[0]));
     course_num--;  // Convert to 0-based index
 
     // Update course name or score based on input
     if (update_name) {
-        // printf("Enter new course name: ");
-        // scanf("%s", student->courses[course_num]);
-        validate_input_data("\n--> Enter new course name: ",student->courses[course_num],STRING,MAX_STRING_LEN,MIN_STRING_LEN);
+        header_msg = "@@                     ----<  UPDATING COURSE NAME  >----                          @@";
+        show_header_art(header_msg);
+        sprintf(prompt,"\n--> Enter new course name (old name is %s): ",student->courses[course_num]);
+        validate_input_data(prompt,student->courses[course_num],STRING,MAX_STRING_LEN,MIN_STRING_LEN);
     } else {
-        // printf("Enter new course score: ");
-        // scanf("%f", &student->scores[course_num]);
-        validate_input_data("\n--> Enter new course score: ",&student->scores[course_num],SCORE,sizeof(float),0);
+        header_msg = "@@                  ----<   UPDATING THE COURSE SCORE  >----                       @@";
+        show_header_art(header_msg);
+        sprintf(prompt,"\n--> Enter new course name (old score for the course %s is %.2f): ",student->courses[course_num],student->scores[course_num]);
+        validate_input_data(prompt,&student->scores[course_num],SCORE,sizeof(float),0);
 
     }
 
