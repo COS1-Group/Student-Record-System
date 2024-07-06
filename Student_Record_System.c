@@ -18,7 +18,6 @@
 #define TOTAL_SCORE 100
 
 const char *LOGO_FILE_NAME = "logo.txt";
-char YES_NO_OPTIONS[] = { 'y','n'};
 
 // Enum for data types
 enum DataType {
@@ -41,11 +40,20 @@ struct Student {
 
 //Global variables
 struct Student *students = NULL;
+char yes_no_options[] = { 'y','n'};
 int student_count = 0;
 bool greet_user = true;
+char *auto_sort_order;
+bool auto_sort;
+bool auto_save;
+
+
 // Function prototypes
 bool repeat_action(char *action, int *response);
 void clear_terminal();
+void sort_students(char *order);
+void auto_sort_save();
+void sort_operation();
 void show_success_message( char *msg);
 void update_course(struct Student *student, bool update_name);
 void modify_student_data();
@@ -103,6 +111,9 @@ int main() {
                 break;
             case 5:
                 show_found_student();
+                break;
+            case 6:
+                sort_operation();
                 break;
             default:
                 break;
@@ -495,7 +506,7 @@ bool repeat_action(char *action, int *response) {
     sprintf(prompt, "\n-> Do you want to %s ? Y/N: ", action);
 
     // Validate user input for 'Y' or 'N'
-    validate_input_choices(prompt, STRING, YES_NO_OPTIONS, response, sizeof(YES_NO_OPTIONS));
+    validate_input_choices(prompt, STRING, yes_no_options, response, sizeof(yes_no_options));
 
     // Convert response to lowercase for consistency
     *response = tolower(*response);
@@ -612,6 +623,7 @@ void add_student(struct Student **students_array, int *student_count) {
     // Increment student count and save record
     (*student_count)++;
     show_success_message("*             Successfully added the student to the database            *");
+    auto_sort_save();// auto sort and save the records after adding new record(auto save is coming soon!!!!!)
     if (repeat_action("add another record",&add_again)){
         add_student(students_array,student_count);
     }
@@ -830,6 +842,7 @@ void modify_student_data() {
                     break;
                 case 5:
                     update_course(student, false);//modify the score of a course
+                    auto_sort_save();// auto sort and save the records after modifying score(s) of the course(s) of a student's record(auto save is coming soon!!!!!)
                     break;
                 case 6:
                     exit(1);
@@ -938,7 +951,7 @@ void delete_a_student() {
             student->name
         );
         
-        validate_input_choices(warning_msg,STRING,YES_NO_OPTIONS,&user_response,sizeof(YES_NO_OPTIONS)/sizeof(YES_NO_OPTIONS[0]));
+        validate_input_choices(warning_msg,STRING,yes_no_options,&user_response,sizeof(yes_no_options)/sizeof(yes_no_options[0]));
         
         if (user_response == 'y') {
             printf("\n=============================================================================\n");
@@ -957,7 +970,7 @@ void delete_a_student() {
             students = new_student_list;
             (student_count)--; // Decrement the total number of students
             show_success_message("*                     Student removed successfully!                      *");
-        
+            auto_sort_save(); // auto sort and save the records after deleting(auto save is coming soon!!!!!)
         } else {
             show_info_message("*                           Deletion canceled!                           *");
         }
@@ -999,7 +1012,7 @@ void delete_all_students() {
     );
     
     // Validate the user's input choice (Y/N)
-    validate_input_choices(warning_msg, STRING, YES_NO_OPTIONS, &user_response, 2);
+    validate_input_choices(warning_msg, STRING, yes_no_options, &user_response, 2);
 
     // Check user's response
     if (user_response == 'y') {
@@ -1101,12 +1114,126 @@ void show_no_data_err(char *action){
     if(strlen(action) == 7){// if action is display(len display is 7)
         printf("!!!                      Cannot %s record(s)                       !!!\n",action);
 
-    }else if (strlen(action)==6){ // actions other than display(delete,search,modify)
+    }else if (strlen(action)==6){ // actions with lenght 6 such as delete,search,modify
         printf("!!!                       Cannot %s record(s)                       !!!\n",action);
 
+    }else if (strlen(action) == 4){// actions with lenght 4 such as sort
+        printf("!!!                        Cannot %s record(s)                        !!!\n",action);
     }
     printf("!!!                          No data available                          !!!\n");
     printf("!!!                                                                     !!!\n");
     printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
      printf("\033[0m"); // Reset text color
+}
+
+/**
+ * Compare function for sorting students in ascending order based on average.
+ * 
+ * @param a Pointer to the first student.
+ * @param b Pointer to the second student.
+ * @return 1 if the average of 'b' is less than 'a', -1 if greater, 0 if equal.
+ */
+int compare_funct_ascend(const void *a, const void *b) {
+    float avg_a = ((struct Student *)a)->average;
+    float avg_b = ((struct Student *)b)->average;
+
+    if (avg_b < avg_a) {
+        return 1;   // Return 1 to indicate 'b' should come after 'a' (ascending order)
+    } else if (avg_b > avg_a) {
+        return -1;  // Return -1 to indicate 'b' should come before 'a' (ascending order)
+    } else {
+        return 0;   // Return 0 if averages are equal
+    }
+}
+
+/**
+ * Compare function for sorting students in descending order based on average.
+ * 
+ * @param a Pointer to the first student.
+ * @param b Pointer to the second student.
+ * @return 1 if the average of 'a' is less than 'b', -1 if greater, 0 if equal.
+ */
+int compare_funct_descend(const void *a, const void *b) {
+    float avg_a = ((struct Student *)a)->average;
+    float avg_b = ((struct Student *)b)->average;
+
+    if (avg_a < avg_b) {
+        return 1;   // Return 1 to indicate 'a' should come after 'b' (descending order)
+    } else if (avg_a > avg_b) {
+        return -1;  // Return -1 to indicate 'a' should come before 'b' (descending order)
+    } else {
+        return 0;   // Return 0 if averages are equal
+    }
+}
+
+/**
+ * Sorts an array of students based on their average score.
+ * 
+ * @param order The order to sort by: 1 for ascending, 2 for descending.
+ * @param all_stud Pointer to the array of students.
+ * @param tot_stud_num Total number of students in the array.
+ * @return A string indicating the sort order ("ascending" or "descending"), or NULL if no students to sort.
+ */
+void sort_students(char *order) {
+    // Sort the students based on the specified order
+    if (strcmp(order, "ascending") == 0) {  // Sort in ascending order
+        // Use qsort to sort students in ascending order of their average score
+        qsort(students, student_count, sizeof(struct Student), compare_funct_ascend);
+    } else if (strcmp(order, "descending") == 0) {  // Sort in descending order
+        // Use qsort to sort students in descending order of their average score
+        qsort(students, student_count, sizeof(struct Student), compare_funct_descend);
+    } else {
+        // If an invalid order is specified, print an error message and return NULL
+        printf("\n!!!Invalid Sort Order!!!\n!!!Please choose 1 for ascending or 2 for descending!!!\n");
+    }
+}
+
+void sort_operation(){
+    char *header_msg, *prompt;
+    int user_order;
+    int order_options[] = {1,2,3};
+    int sort_again;
+    char success_msg[MAX_MSG_LEN];
+
+    clear_terminal();
+    header_msg = "@@             ----< SORTING THE STUDENTS BY ORDER OF AVERAGE MARK >----           @@\n";
+    show_header_art(header_msg);
+
+    // Check if there are any students to sort
+    if (student_count > 0) {
+        prompt = 
+            "\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n"
+            "@@                                                                                @@\n"
+            "@@                            SELECT THE SORT ORDER                               @@\n"
+            "@@                            ---------------------                               @@\n"
+            "@@                            1. Ascending order                                  @@\n"
+            "@@                            2. Descending order                                 @@\n"
+            "@@                            3. Exit                                             @@\n"
+            "@@                                                                                @@\n"
+            "           --> Please type a number to select an option from above: ";
+
+        validate_input_choices(prompt,INTEGER,order_options,&user_order,3);
+        auto_sort = true;
+        if (user_order == 1){
+            auto_sort_order = "ascending";
+            sort_students(auto_sort_order);
+        }else if (user_order == 2){
+            auto_sort_order = "descending";
+            sort_students(auto_sort_order);
+        }
+        sprintf(success_msg,"*      Successfully sorted the student records in %s order      *",auto_sort_order);
+        show_success_message(success_msg);
+        if (repeat_action("sort records by a different order",&sort_again)){
+            sort_operation();
+        }
+    }else {
+        show_no_data_err("sort");
+    }
+    
+}
+
+void auto_sort_save(){
+    if (auto_sort){
+        sort_students(auto_sort_order);
+    }
 }
