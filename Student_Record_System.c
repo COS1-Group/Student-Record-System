@@ -46,6 +46,9 @@ int student_count = 0;
 // Function prototypes
 bool repeat_action(char *action, int *response);
 void clear_terminal();
+void update_course(struct Student *student, bool update_name);
+void modify_student_data();
+void show_not_found_err_msg();
 void show_no_data_err(char *action);
 void show_header_art(char *header_string);
 void print_logo();
@@ -85,6 +88,9 @@ int main() {
         {
             case 1:
                 add_student(&students,&student_count);
+                break;
+            case 2:
+                modify_student_data();
                 break;
             case 3:
                 display_all_students();
@@ -683,7 +689,7 @@ void display_student_info(struct Student *student, int student_index) {
 int search_by_roll(char *purpose) {
     if (student_count > 0) {
         int roll_num_to_search;
-        char *error_msg;
+        // char *error_msg;
         char prompt[MAX_STRING_LEN];
         
         // Prompt user for roll number input
@@ -707,8 +713,9 @@ int search_by_roll(char *purpose) {
         
         // Print error message if student with roll number not found
         if (!found) {
-            error_msg = "!!!              There is no student with that roll number              !!!\n!!!                    Please confirm and try again                     !!!" ;
-            show_error_art(error_msg);
+            // error_msg = "!!!              There is no student with that roll number              !!!\n!!!                    Please confirm and try again                     !!!" ;
+            // show_error_art(error_msg);
+            show_not_found_err_msg();
         }
     } else {
         show_no_data_err("search");
@@ -717,6 +724,12 @@ int search_by_roll(char *purpose) {
     return -1; // Return -1 indicating no match found
 }
 
+void show_not_found_err_msg(){
+    char *error_msg;
+    error_msg = "!!!              There is no student with that roll number              !!!\n!!!                    Please confirm and try again                     !!!" ;
+    show_error_art(error_msg);
+
+}
 
 /**
  * @brief Searches for a student by roll number and displays their information if found.
@@ -735,4 +748,125 @@ void show_found_student() {
         struct Student *found_student = &(students[student_index]);
         display_student_info(found_student, student_index);
     }
+}
+
+/**
+ * Modifies student data based on user input.
+ *
+ * @param all_students Pointer to the array of all students.
+ * @param totalnum_of_students Pointer to the total number of students.
+ */
+void modify_student_data() {
+    // Find student by roll number
+    int student_index = search_by_roll("modify");
+    char *error_msg;
+    int update_options[] = {1,2,3,4,5,6};
+    if (student_index != -1) {
+        struct Student *student = &(students[student_index]);
+        // Display student information
+        display_student_info(student,student_index);
+
+        // Get user choice for modification
+        int choice;
+        char option_art[ART_SIZE];
+
+        sprintf(option_art,
+        "\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n"
+        "@@                                                                                @@\n"
+        "@@                            SELECT WHAT TO UPDATE                               @@\n"
+        "@@                            ---------------------                               @@\n"
+        "@@                            1. Student's name                                   @@\n"
+        "@@                            2. Student's department                             @@\n"
+        "@@                            3. Student's roll number                            @@\n"
+        "@@                            4. Course name                                      @@\n"
+        "@@                            5. Course score                                     @@\n"
+        "@@                            6. Exit                                             @@\n"
+        "@@                                                                                @@\n"
+        "           --> Please type a number to select an option from above: ");
+        // printf("\nWhat would you like to change?\n");
+        // printf("1. Name\n2. Department\n3. Roll number\n4. Course name\n5. Course score\n");
+        // printf("Enter a number to choose an option: ");
+        // scanf("%d", &choice);
+        validate_input_choices(option_art,INTEGER,update_options,&choice,sizeof(update_options)/sizeof(update_options[0]));
+
+        // Update based on user choice
+        switch (choice) {
+            case 1:
+                validate_input_data("\n--> Enter new name: ",student->name,STRING,MAX_STRING_LEN,MIN_STRING_LEN);
+                break;
+            case 2:
+                validate_input_data("\n--> Enter new department: ",student->department,STRING,MAX_STRING_LEN,MIN_STRING_LEN);
+                break;
+            case 3: {
+                int new_roll;
+                while (true) {
+                    validate_input_data("\n--> Enter new roll number: ",&new_roll,INTEGER,0,0);
+                    if (!is_duplicate_roll_num( new_roll)) {
+                        student->roll_number = new_roll;
+                        break;
+                    } else {
+                        error_msg = "!!!           A student with this roll number already exists            !!!\n!!!                  Please enter a unique roll number                  !!!";
+                        show_error_art(error_msg);
+                    }
+                }
+                break;
+            }
+            case 4:
+                update_course(student, true);
+                break;
+            case 5:
+                update_course(student, false);
+                break;
+            case 6:
+                exit(1);
+                break;
+            default:
+                printf("Invalid choice!\n");
+                break;
+        }
+        
+    } 
+}
+
+/**
+ * Updates a course's name or score for a given student.
+ *
+ * @param student Pointer to the student to be updated.
+ * @param update_name Boolean indicating whether to update the course name (true) or score (false).
+ */
+void update_course(struct Student *student, bool update_name) {
+    int course_num;
+    int course_options[] = {1,2,3};
+    // Display courses and their scores
+    printf("Choose a course to update:\n");
+    for (int i = 0; i < MAX_COURSES; i++) {
+        printf("%d. %s: %.2f\n", i + 1, student->courses[i], student->scores[i]);
+    }
+    // }
+    // printf("Enter a number: ");
+    // scanf("%d", &course_num);
+    validate_input_choices("\n--> Enter a number: ",INTEGER,course_options,&course_num,sizeof(course_options)/sizeof(course_options[0]));
+    course_num--;  // Convert to 0-based index
+
+    // Update course name or score based on input
+    if (update_name) {
+        // printf("Enter new course name: ");
+        // scanf("%s", student->courses[course_num]);
+        validate_input_data("\n--> Enter new course name: ",student->courses[course_num],STRING,MAX_STRING_LEN,MIN_STRING_LEN);
+    } else {
+        // printf("Enter new course score: ");
+        // scanf("%f", &student->scores[course_num]);
+        validate_input_data("\n--> Enter new course score: ",&student->scores[course_num],SCORE,sizeof(float),0);
+
+    }
+
+    // Update average score and grade
+    student->average = 0.0f;
+    for (int i = 0; i < MAX_COURSES; i++) {
+        student->average += student->scores[i];
+    }
+    student->average /= MAX_COURSES;
+
+    strcpy(student->grade, student->average >= PASS_THRESHOLD ? "Pass" : "Fail");
+   
 }
