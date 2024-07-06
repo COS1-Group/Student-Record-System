@@ -4,11 +4,14 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <unistd.h>
+
 
 
 #define MAX_STRING_LEN 100 // maximum length of a person's name
+#define MAX_MSG_LEN 256
 #define MIN_STRING_LEN 5 
-#define ART_SIZE 2000
+#define ART_SIZE 1262
 #define TOTAL_SCORE 100
 #define MAX_COURSES 3
 #define PASS_THRESHOLD 55
@@ -39,13 +42,18 @@ struct Student {
 //Global variables
 struct Student *students = NULL;
 int student_count = 0;
-
+bool greet_user = true;
 // Function prototypes
+bool repeat_action(char *action, int *response);
 void clear_terminal();
+void show_success_message( char *msg);
+void update_course(struct Student *student, bool update_name);
+void modify_student_data();
+void show_not_found_err_msg();
 void show_no_data_err(char *action);
 void show_header_art(char *header_string);
 void print_logo();
-void show_error_art(char *msg);
+void show_error_message(char *msg);
 void get_user_name(char *user_name);
 void convert_to_upper(char *str);
 void validate_input_choices(char *prompt, enum DataType type, void *target, int *user_choice_input, int len_target);
@@ -54,7 +62,11 @@ void add_student(struct Student **students_array, int *student_count);
 void display_all_students();
 void display_student_info(struct Student *student, int student_index);
 int get_main_program_choice();
+int search_by_roll(char *purpose);
 void clear_input_buffer() ;
+void show_found_student();
+void delete_action();
+void show_info_message(char *msg);
 
 int main() {
     /*
@@ -70,25 +82,47 @@ int main() {
     sprintf(welcome_user_msg,"          ----< WELCOME ABOARD %s! WHAT WOULD YOU LIKE TO DO? >----                 \n",user_name);
     show_header_art(welcome_user_msg);
 
-    int selected_operation = get_main_program_choice();
-    printf("Selected option %d\n", selected_operation);
-
-    switch (selected_operation)
+    while (true)
     {
-        case 1:
-            add_student(&students,&student_count);
-            display_all_students();
+        int selected_operation = get_main_program_choice();
+        // printf("Selected option %d\n", selected_operation);
+        greet_user = false;
+        switch (selected_operation)
+        {
+            case 1:
+                add_student(&students,&student_count);
+                break;
+            case 2:
+                modify_student_data();
+                break;
+            case 3:
+                display_all_students();
+                break;
+            case 4:
+                delete_action();
+                break;
+            case 5:
+                show_found_student();
+                break;
+            default:
+                break;
+        }
+
+        int do_action_again_response;
+        if(!repeat_action("perform another action",&do_action_again_response)){
             break;
-        case 2:
-            display_all_students();
-            break;
-        default:
-            break;
+        }
     }
+    free(students);
 
     return 0;
 }
 
+/**
+ * @brief Shows the header art for an action to be performed(such as add, modify,etc)
+ * 
+ * @param header_string The message inside the header
+*/
 void show_header_art(char *header_string){
     printf("\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
     printf("@@                                                                                @@\n");
@@ -96,6 +130,13 @@ void show_header_art(char *header_string){
     printf("@@                                                                                @@\n");
     printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
 }
+
+/**
+ * @brief Clears new line from character input buffer
+ * When using scanf to get a character from the user, the compiler automatically adds a newline
+ * This function removes the newline to prevent errors in operation
+ * 
+*/
 void clear_input_buffer() {
     int c;
     while ((c = getchar()) != '\n' && c != EOF);
@@ -114,14 +155,11 @@ void print_logo() {
     inFile = fopen(LOGO_FILE_NAME, "r");
     // Check if the file is available to be loaded
     if (inFile == NULL) {
-        printf("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-        printf("!!!                                          !!!\n");
-        printf("!!!                ERROR:                    !!!\n");
-        printf("!!!           File failed to load            !!!\n");
-        printf("!!!            No logo displayed             !!!\n");
-        printf("!!!                                          !!!\n");
-        printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+        show_error_message(
+            "!!!                          File failed to load                         !!!\n"
+            "!!!                          No logo displayed                           !!!\n"
 
+        );
         return;
     }
 
@@ -214,6 +252,7 @@ void validate_input_choices(char *prompt, enum DataType type, void *target, int 
         } else if (type == STRING) { 
             target_string = "character";
             *user_choice_input = user_input[0]; // Store the first character of user input as char
+            *user_choice_input = tolower(*user_choice_input);
             char *char_array = (char *)target; // If the datatype is character, cast the target to char pointer
             for (int i = 0; i < len_target; i++) {
                 // Loop through the array to check if the user's input matches any element
@@ -226,9 +265,14 @@ void validate_input_choices(char *prompt, enum DataType type, void *target, int 
 
         if (!is_valid_userchoice) {
             clear_terminal();
-            char error_msg[ART_SIZE];
-            sprintf(error_msg,"!!!      Please enter a valid %s from the options provided         !!!",target_string);
-            show_error_art(error_msg);
+            char error_msg[MAX_MSG_LEN];
+            sprintf(
+                error_msg,
+                "\n!!!                          Invalid input                              !!!"
+                "\n!!!                                                                     !!!"
+                  "\n        Please enter a valid %s from the options provided            ",
+                target_string);
+            show_error_message(error_msg);
 
         }
     }
@@ -239,15 +283,15 @@ void validate_input_choices(char *prompt, enum DataType type, void *target, int 
  * @param msg The message string to include inside the art
  * 
 */
-void show_error_art(char *msg){
+void show_error_message(char *msg){
+    printf("\n\033[1;31m"); // Set text color to red
     printf("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     printf("!!!                                                                     !!!\n");
-    printf("!!!                              ERROR:                                 !!!\n");
-    printf("!!!                                                                     !!!\n");
-    printf("!!!                          Invalid input                              !!!\n");
-    printf("%s\n", msg);
-    printf("!!!                                                                     !!!\n");
+    printf("!!!                              ERROR:                                 !!!");
+    printf("%s", msg);
+    printf("\n!!!                                                                     !!!\n");
     printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+     printf("\033[0m"); // Reset text color
 }
 
 /**
@@ -289,7 +333,7 @@ void validate_input_data(const char *prompt, void *input_buffer, enum DataType t
     bool valid = false;
     char buffer[256];
     float score;
-    char error_msg[MAX_STRING_LEN * 2];
+    char error_msg[MAX_MSG_LEN *2];
 
     while (!valid) {
         printf("%s", prompt);
@@ -305,8 +349,12 @@ void validate_input_data(const char *prompt, void *input_buffer, enum DataType t
                     strncpy((char *)input_buffer, buffer, max_length); // Copy up to max_length characters
                     valid = true;
                 } else {
-                    sprintf(error_msg,"!!!        Please enter a string with length between %d and %d,         !!!\n!!!        containing only alphabetic or alphanumeric characters        !!!",MIN_STRING_LEN,MAX_STRING_LEN);
-                    show_error_art(error_msg);
+                    sprintf(error_msg,
+                                    "\n!!!                          Invalid input                              !!!"
+                                    "\n!!!                                                                     !!!"
+                                    "\n!!!        Please enter a string with length between %d and %d,         !!!"
+                                    "\n!!!        containing only alphabetic or alphanumeric characters        !!!",MIN_STRING_LEN,MAX_STRING_LEN);
+                    show_error_message(error_msg);
                 }
                 break;
 
@@ -315,7 +363,10 @@ void validate_input_data(const char *prompt, void *input_buffer, enum DataType t
                 if (sscanf(buffer, "%d", (int *)input_buffer) == 1 && !is_alphanumeric_or_alphabetic(buffer)) {
                     valid = true;
                 } else {
-                    show_error_art("!!!                    Please enter a valid integer                     !!!");
+                    show_error_message(
+                                    "\n!!!                          Invalid input                              !!!"
+                                    "\n!!!                                                                     !!!"
+                                    "\n!!!                    Please enter a valid integer                     !!!");
                 }
                 break;
 
@@ -324,7 +375,10 @@ void validate_input_data(const char *prompt, void *input_buffer, enum DataType t
                 if (sscanf(buffer, "%f", (float *)input_buffer) == 1 && !is_alphanumeric_or_alphabetic(buffer)) {
                     valid = true;
                 } else {
-                    show_error_art("!!!                Please enter a valid float number               !!!");
+                    show_error_message(
+                                    "\n!!!                          Invalid input                              !!!"
+                                    "\n!!!                                                                     !!!"
+                                    "\n!!!                  Please enter a valid float number                  !!!");
                 }
                 break;
 
@@ -334,8 +388,14 @@ void validate_input_data(const char *prompt, void *input_buffer, enum DataType t
                     *(float *)input_buffer = score;
                     valid = true;
                 } else {
-                    sprintf(error_msg,"!!!      Please enter a numerical value less than or equal to %d       !!!",TOTAL_SCORE);
-                    show_error_art(error_msg);
+                    sprintf(
+                        error_msg,
+                        "\n!!!                          Invalid input                              !!!"
+                        "\n!!!                                                                     !!!"
+                        "\n!!!      Please enter a numerical value less than or equal to %d       !!!",
+                        TOTAL_SCORE
+                    );
+                    show_error_message(error_msg);
                 }
                 break;
 
@@ -351,6 +411,7 @@ void validate_input_data(const char *prompt, void *input_buffer, enum DataType t
  * @brief Gets the integer value representing the operation a user wants to perform, e.g.,
  * If they choose, 1, it means they want to add a student, if the choose 2, they want to update a record, and so on.
  *
+ * @return The number the user enters which represents the action they want to perform.
  */
 int get_main_program_choice() {
 
@@ -360,6 +421,9 @@ int get_main_program_choice() {
     char option_art[ART_SIZE];
     // printf("len opt: %d", len_options);
     // Store the ASCII art in the buffer
+    if(!greet_user){
+        clear_terminal();
+    }
     sprintf(option_art,
         "\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n"
         "@@                                                                                @@\n"
@@ -468,7 +532,8 @@ void add_student(struct Student **students_array, int *student_count) {
         *students_array = realloc(*students_array, (*student_count + 1) * sizeof(struct Student)); // Reallocate for additional student
     }
     if (*students_array == NULL) {
-        printf("Memory allocation failed!\n");
+        show_error_message("!!!                       Memory allocation failed                        !!!");
+        // printf("Memory allocation failed!\n");
         exit(1);
     }
 
@@ -495,8 +560,12 @@ void add_student(struct Student **students_array, int *student_count) {
         if (!duplicate_roll) {
             break;
         }
-        error_msg = "!!!           A student with this roll number already exists            !!!\n!!!                  Please enter a unique roll number                  !!!";
-        show_error_art(error_msg);
+        error_msg = 
+                    "\n!!!                          Invalid input                              !!!"
+                    "\n!!!                                                                     !!!"
+                    "\n!!!           A student with this roll number already exists            !!!"
+                    "\n!!!                  Please enter a unique roll number                  !!!";
+        show_error_message(error_msg);
     }
 
     // Prompt and validate each course name and score
@@ -517,8 +586,12 @@ void add_student(struct Student **students_array, int *student_count) {
                 strncpy(new_student->courses[i], course_name, MAX_STRING_LEN);
                 break;
             }
-            error_msg = "!!!                     That course already exists                      !!!\n!!!                   Please enter a unique course name                 !!!";
-            show_error_art(error_msg);
+            error_msg = 
+                        "\n!!!                          Invalid input                              !!!"
+                        "\n!!!                                                                     !!!"
+                        "\n!!!                     That course already exists                      !!!"
+                        "\n!!!                   Please enter a unique course name                 !!!";
+            show_error_message(error_msg);
             //printf("!!! That course already exists. Please enter a unique course name.\n");
         }
 
@@ -538,11 +611,478 @@ void add_student(struct Student **students_array, int *student_count) {
 
     // Increment student count and save record
     (*student_count)++;
-
+    show_success_message("*             Successfully added the student to the database            *");
     if (repeat_action("add another record",&add_again)){
         add_student(students_array,student_count);
     }
     //auto_sort_save_record(*students_array, *student_count); // Sort and save student records(coming soon...)
+}
+
+
+/**
+ * @brief Display information of all students.
+ * 
+ */
+void display_all_students() {
+    int display_again;
+    char *header_msg;
+    clear_terminal();
+    if (student_count <= 0) {
+        show_no_data_err("display");
+        return;
+    }
+    header_msg = "@@                  ----< DISPLAYING ALL THE STUDENTS RECORD >----                @@";
+    show_header_art(header_msg);
+    printf("\n");
+    for (int i = 0; i < student_count; i++) {
+        display_student_info(&students[i], i);
+    }
+}
+
+/**
+ * @brief Display information of a single student in a formatted way.
+ *This is what the format mean ( please note that the formatting not perfect and may change depending on the actual value of variables):
+    %-25c:
+        %-: Left-align the string in the given field.
+        25: Minimum field width of 15 characters.
+        s: Format as a character.
+    %-15s:
+        %-: Left-align the string in the given field.
+        15: Minimum field width of 15 characters.
+        s: Format as a string.
+ * 
+ * @param student Pointer to the student structure.
+ * @param student_index Index of the student in the array.
+ */
+void display_student_info(struct Student *student, int student_index) {
+   
+    printf("\n================================================================================\n");
+    printf("                          STUDENT %d: %s                          \n", student_index + 1, student->name);
+    printf("================================================================================\n");
+    printf("%-25c  %-15s: %s \n", ' ',"Department", student->department);
+    printf("%-25c  %-15s: %d \n", ' ',"Roll Number", student->roll_number);
+    printf("================================================================================\n");
+    printf("                           COURSES AND SCORES                               \n");
+    printf("--------------------------------------------------------------------------------\n");
+
+    for (int j = 0; j < MAX_COURSES; j++) {
+        printf("%-25c  %-15s : %.2f \n", ' ',student->courses[j], student->scores[j]);
+    }
+
+    printf("--------------------------------------------------------------------------------\n");
+    printf("%-25c  %-15s: %.2f \n", ' ',"Average", student->average);
+    printf("%-25c  %-15s: %s \n", ' ',"Grade", student->grade);
+    printf("================================================================================\n");
+}
+
+/**
+ * @brief Searches for a student by their roll number in the  array of students.
+ * 
+ * This function prompts the user to enter a roll number and searches through the array
+ * of available students to find a match. It prints a visual indication of progress
+ * while searching and returns the index of the student if found, otherwise returns -1.
+ * 
+ * @param purpose The reason why we are searching. This is necessary because when we want to
+ * modify or delete a record, we have to first search for that record by roll number, hence, this function can be 
+ * reused for those other purposes
+ * 
+ * @return int Index of the student in the array if found, -1 if not found or no students available.
+ */
+int search_by_roll(char *purpose) {
+    if (student_count > 0) {
+        int roll_num_to_search;
+        // char *error_msg;
+        char prompt[MAX_STRING_LEN];
+        
+        // Prompt user for roll number input
+        sprintf(prompt,"\n--> Enter the roll number to %s: ",purpose);
+        validate_input_data(prompt, &roll_num_to_search, INTEGER, 0, 0);
+        
+        printf("\n<<<<<<<<-- Please wait while I query the database: "); // Print initial message
+
+        // Simulate querying delay with visual feedback
+        bool found = false;
+        for (int i = 0; i < student_count; i++) {
+            printf("* "); // Visual feedback to indicate progress
+            fflush(stdout); // Flush stdout to ensure immediate printing of '*'
+            sleep(1);   // Simulate querying delay (replace with appropriate delay function)
+            
+            if (roll_num_to_search == students[i].roll_number) {
+                found = true;
+                return i; // Return index of the student if found
+            }
+        }
+        
+        // Print error message if student with roll number not found
+        if (!found) {
+            show_not_found_err_msg();
+        }
+    } else {
+        show_no_data_err("search");
+    }
+    
+    return -1; // Return -1 indicating no match found
+}
+
+void show_not_found_err_msg(){
+    char *error_msg;
+    error_msg = "\n!!!                          Invalid input                              !!!"
+                "\n!!!                                                                     !!!"
+                "\n!!!              There is no student with that roll number              !!!"
+                "\n!!!                    Please confirm and try again                     !!!" ;
+    show_error_message(error_msg);
+
+}
+
+/**
+ * @brief Searches for a student by roll number and displays their information if found.
+ * 
+ * This function calls search_by_roll() to find a student by their roll number.
+ * If a student is found, it retrieves the student's information and displays it using
+ * display_student_info().
+ */
+void show_found_student() {
+    char *header_msg;
+    int search_again;
+    header_msg = "@@                 ---< SEARCHING FOR A STUDENT BY ROLL NUMBER >---               @@";
+    clear_terminal();
+    show_header_art(header_msg);
+    int student_index = search_by_roll("search for"); //get the index of the student by their roll number
+    if (student_index != -1) {
+        struct Student *found_student = &(students[student_index]);
+        display_student_info(found_student, student_index);
+    }
+
+    if (repeat_action("search for another record",&search_again)){
+            show_found_student();
+        }
+}
+
+/**
+ * Modifies student data based on user input.
+ *
+ * The function first searches for the student by roll number, displays the student information
+ * Then user can modify whatever they want
+ */
+void modify_student_data() {
+    char *error_msg,*header_msg;
+    int update_options[] = {1,2,3,4,5,6};
+    int modify_again;
+
+    header_msg = "@@                 ----< MODIFYING A STUDENT'S RECORD >----                       @@";
+    clear_terminal();
+    show_header_art(header_msg);
+    
+    if (student_count > 0){
+            // Find student by roll number
+        int student_index = search_by_roll("modify");
+        if (student_index != -1) {
+            struct Student *student = &(students[student_index]);
+            // Display student information
+            display_student_info(student,student_index);
+
+            // Get user choice for modification
+            int choice;
+            char option_art[ART_SIZE];
+            
+            sprintf(option_art,
+            "\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n"
+            "@@                                                                                @@\n"
+            "@@                            SELECT WHAT TO UPDATE                               @@\n"
+            "@@                            ---------------------                               @@\n"
+            "@@                            1. Student's name                                   @@\n"
+            "@@                            2. Student's department                             @@\n"
+            "@@                            3. Student's roll number                            @@\n"
+            "@@                            4. Course name                                      @@\n"
+            "@@                            5. Course score                                     @@\n"
+            "@@                            6. Exit                                             @@\n"
+            "@@                                                                                @@\n"
+            "           --> Please type a number to select an option from above: ");
+            validate_input_choices(option_art,INTEGER,update_options,&choice,sizeof(update_options)/sizeof(update_options[0]));
+
+            // Update based on user choice
+            switch (choice) {
+                case 1:
+                    validate_input_data("\n--> Enter new name: ",student->name,STRING,MAX_STRING_LEN,MIN_STRING_LEN);
+                    break;
+                case 2:
+                    validate_input_data("\n--> Enter new department: ",student->department,STRING,MAX_STRING_LEN,MIN_STRING_LEN);
+                    break;
+                case 3: {
+                    int new_roll;
+                    while (true) {
+                        validate_input_data("\n--> Enter new roll number: ",&new_roll,INTEGER,0,0);
+                        if (!is_duplicate_roll_num( new_roll)) {
+                            student->roll_number = new_roll;
+                            break;
+                        } else {
+                            error_msg = "\n!!!                          Invalid input                              !!!"
+                                        "\n!!!                                                                     !!!"
+                                        "\n!!!           A student with this roll number already exists            !!!"
+                                        "\n!!!                  Please enter a unique roll number                  !!!";
+                            show_error_message(error_msg);
+                        }
+                    }
+                    break;
+                }
+                case 4:
+                    update_course(student, true);//modify the name of a course
+                    break;
+                case 5:
+                    update_course(student, false);//modify the score of a course
+                    break;
+                case 6:
+                    exit(1);
+                    break;
+                default:
+                    printf("Invalid choice!\n");
+                    break;
+            }
+            show_success_message("*               Successfully updated the student's record               *");
+            if (repeat_action("modify a record again",&modify_again)){
+                modify_student_data();
+            }
+        }else {
+            show_not_found_err_msg(); //the student whose roll number was entered is not in the database
+        }
+    }else {
+        show_no_data_err("modify");
+    }
+    
+}
+
+/**
+ * Updates a course's name or score for a given student.
+ *
+ * @param student Pointer to the student to be updated.
+ * @param update_name Boolean indicating whether to update the course name (true) or score (false).
+ */
+void update_course(struct Student *student, bool update_name) {
+    int course_num;
+    int course_options[] = {1,2,3};
+    char *header_msg;
+    char prompt[MAX_MSG_LEN];
+
+    // Display courses and their scores
+    header_msg = "@@                  ----< SELECT THE COURSE TO UPDATE >----                        @@\n";
+    clear_terminal();
+    printf("\n====================================================================================\n");
+    printf("                                 COURSES AND SCORES                                  \n");
+    printf("-------------------------------------------------------------------------------------\n");
+    show_header_art(header_msg);
+    printf("\n");
+    for (int j = 0; j < MAX_COURSES; j++) {
+        printf("%-25c %d. %-15s : %-15.2f \n", ' ', j + 1,student->courses[j], student->scores[j]);
+    }
+    
+    validate_input_choices( "\n--> Please type a number to select an option from above: ",INTEGER,course_options,&course_num,sizeof(course_options)/sizeof(course_options[0]));
+    course_num--;  // Convert to 0-based index
+
+    // Update course name or score based on input
+    if (update_name) {
+        header_msg = "@@                     ----<  UPDATING COURSE NAME  >----                          @@";
+        show_header_art(header_msg);
+        sprintf(prompt,"\n--> Enter new course name (old name is %s): ",student->courses[course_num]);
+        validate_input_data(prompt,student->courses[course_num],STRING,MAX_STRING_LEN,MIN_STRING_LEN);
+    } else {
+        header_msg = "@@                  ----<   UPDATING THE COURSE SCORE  >----                       @@";
+        show_header_art(header_msg);
+        sprintf(prompt,"\n--> Enter new course name (old score for the course %s is %.2f): ",student->courses[course_num],student->scores[course_num]);
+        validate_input_data(prompt,&student->scores[course_num],SCORE,sizeof(float),0);
+
+    }
+
+    // Update average score and grade
+    student->average = 0.0f;
+    for (int i = 0; i < MAX_COURSES; i++) {
+        student->average += student->scores[i];
+    }
+    student->average /= MAX_COURSES;
+
+    strcpy(student->grade, student->average >= PASS_THRESHOLD ? "Pass" : "Fail");
+   
+}
+
+/**
+ * Deletes a single student from the list of students.
+ *
+ */
+void delete_a_student() {
+    int user_response;
+    int delete_again;
+
+    int index_of_student;
+    char warning_msg[MAX_MSG_LEN * 3],*header_msg;
+    header_msg ="@@                 ----< DELETING RECORD(S) FROM THE DATABASE >----                @@";
+
+    clear_terminal();
+    show_header_art(header_msg);
+    index_of_student = search_by_roll("delete");
+    // printf("%d", index_of_student);
+
+    if (index_of_student > -1){
+        struct Student *student = &(students[index_of_student]);
+
+        // Display student information
+        display_student_info(student,index_of_student);
+        printf("\n\033[1;33m"); // Set text color to yellow
+        sprintf(warning_msg,
+            "\n\033[1;33m" // Set text color to yellow
+            "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+            "\n!!!                                                                     !!!"
+            "\n!!!                              WARINING:                              !!!"
+            "\n!!!                                                                     !!!"
+            "\n                 This will delete %s's data permanently                      "
+            "\n                   Do you want to proceed!!!? Y/N: "
+            "\033[0m",
+            student->name
+        );
+        
+        validate_input_choices(warning_msg,STRING,YES_NO_OPTIONS,&user_response,sizeof(YES_NO_OPTIONS)/sizeof(YES_NO_OPTIONS[0]));
+        
+        if (user_response == 'y') {
+            printf("\n=============================================================================\n");
+            printf("\n                   DELETING %s FROM THE DATABASE                   \n", student->name);
+            printf("\n=============================================================================\n");
+
+            for (int i = index_of_student; i < student_count - 1; i++) {
+                (students)[i] = (students)[i + 1];
+            }
+            struct Student *new_student_list = realloc(students, (student_count - 1) * sizeof(struct Student)); // Reallocate memory to shrink the list
+            if (!new_student_list && (student_count - 1) > 0) {
+                show_error_message("!!!                       Memory allocation failed                        !!!");
+                return;
+            }
+
+            students = new_student_list;
+            (student_count)--; // Decrement the total number of students
+            show_success_message("*                     Student removed successfully!                      *");
+        
+        } else {
+            show_info_message("*                           Deletion canceled!                           *");
+        }
+    }else {
+        show_not_found_err_msg();
+    }
+    
+    if (repeat_action("delete another record",&delete_again)){
+        delete_a_student();
+    }    
+}
+
+/**
+ * Deletes all students from the list of students.
+ * 
+ * This function prompts the user with a warning message about deleting all student records permanently.
+ * If the user confirms the action by typing 'y', it frees the memory allocated for the student records,
+ * sets the student list to NULL, and updates the student count to 0. If the user cancels the action by typing 'n',
+ * it displays a cancellation message.
+ */
+void delete_all_students() {
+    int user_response;
+    char warning_msg[MAX_MSG_LEN * 2]; // Buffer for the warning message
+    char *header_msg = "@@                 ----< DELETING RECORD(S) FROM THE DATABASE >----               @@";
+
+    clear_terminal();  // Clear the terminal screen
+    show_header_art(header_msg);  // Display the header art
+
+    // Create the warning message with yellow text color
+    sprintf(warning_msg,
+        "\n\033[1;33m" // Set text color to yellow
+        "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+        "\n!!!                                                                     !!!"
+        "\n!!!                              WARNING:                              !!!"
+        "\n!!!                                                                     !!!"
+        "\n!!!              This will delete all records permanently               !!!"
+        "\n                     Do you want to proceed!!!? Y/N: "
+        "\033[0m" // Reset text color
+    );
+    
+    // Validate the user's input choice (Y/N)
+    validate_input_choices(warning_msg, STRING, YES_NO_OPTIONS, &user_response, 2);
+
+    // Check user's response
+    if (user_response == 'y') {
+        // User confirmed the deletion
+        printf("\n=============================================================================\n");
+        printf("\n                   DELETING ALL STUDENTS FROM THE DATABASE                   \n");
+        printf("\n=============================================================================\n");
+
+        free(students);  // Free the memory allocated for the student records
+        students = NULL;  // Set the student list to NULL
+        student_count = 0;  // Reset the student count to 0
+
+        // Display success message
+        show_success_message("*                   All students deleted successfully!                   *");
+    } else {
+        // User canceled the deletion
+        show_info_message("*                           Deletion canceled!                           *");
+    } 
+}
+
+/**
+ * Handles the deletion actions based on user input: delete a single student or all students.
+ *
+ */
+void delete_action() {
+    int selection;
+    int valid_choices[] = {1, 2,3};
+    char option_art[ART_SIZE];
+        
+    sprintf(option_art,
+    "\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n"
+    "@@                                                                                @@\n"
+    "@@                            SELECT WHAT TO DELETE                               @@\n"
+    "@@                            ---------------------                               @@\n"
+    "@@                            1. Delete a student                                 @@\n"
+    "@@                            2. Delete all students                              @@\n"
+    "@@                            3. Exit                                             @@\n"
+    "@@                                                                                @@\n"
+    "           --> Please type a number to select an option from above: ");
+    if (student_count > 0) {
+        validate_input_choices(option_art,INTEGER,valid_choices,&selection,sizeof(valid_choices)/sizeof(valid_choices[0]));
+        switch (selection) {
+            case 1:
+                delete_a_student();
+                break;
+            case 2:
+                delete_all_students();
+                break;
+            case 3:
+                exit(1);
+                break;
+            default:
+                printf("Invalid choice.\n"); //this line is negligible because checking for invalid option 
+                                             //is already handled inside the validate_input_choices function
+                break;
+        }
+    } else {
+        show_no_data_err("delete");
+    }
+}
+
+void show_success_message(char *msg) {
+    printf("\n\033[1;32m"); // Set text color to green
+    printf("*************************************************************************\n");
+    printf("*                                                                       *\n");
+    printf("*                          SUCCESS:                                     *\n");
+    printf("*                                                                       *\n");
+    printf("%s\n", msg);
+    printf("*                                                                       *\n");
+    printf("*************************************************************************\n");
+    printf("\033[0m"); // Reset text color
+}
+
+void show_info_message(char *msg) {
+    printf("\n\033[1;34m"); // Set text color to blue
+    printf("*************************************************************************\n");
+    printf("*                                                                       *\n");
+    printf("*                          INFORMATION:                                 *\n");
+    printf("*                                                                       *\n");
+    printf("    %s\n", msg);
+    printf("*                                                                       *\n");
+    printf("*************************************************************************\n");
+    printf("\033[0m"); // Reset text color
 }
 
 /**
@@ -553,6 +1093,7 @@ void add_student(struct Student **students_array, int *student_count) {
  * @param action The action being performed, e.g., display , delete, modify and search.
 */
 void show_no_data_err(char *action){
+    printf("\n\033[1;31m"); // Set text color to red
     printf("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     printf("!!!                                                                     !!!\n");
     printf("!!!                              ERROR:                                 !!!\n");
@@ -567,68 +1108,5 @@ void show_no_data_err(char *action){
     printf("!!!                          No data available                          !!!\n");
     printf("!!!                                                                     !!!\n");
     printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-}
-/**
- * @brief Display information of all students.
- * 
- * 
- */
-void display_all_students() {
-    int display_again;
-    clear_terminal();
-    if (student_count <= 0) {
-        show_no_data_err("display");
-        return;
-    }
-    for (int i = 0; i < student_count; i++) {
-        display_student_info(&students[i], i);
-    }
-    if (repeat_action("display all records again",&display_again)){
-        display_all_students();
-    }
-}
-
-/**
- * @brief Display information of a single student in a formatted way.
- *This is what the format mean ( please note that the formatting not perfect and may change depending on the actual value of variables):
-    %-15s:
-        %-: Left-align the string in the given field.
-        15: Minimum field width of 15 characters.
-        s: Format as a string.
-    %-10.2f:
-        %-: Left-align the number in the given field.
-        10: Minimum field width of 10 characters.
-        .2: Display 2 digits after the decimal point.
-        f: Format as a floating-point number.
-    %-50s:
-        %-: Left-align the string in the given field.
-        50: Minimum field width of 50 characters.
-        s: Format as a string.
-    %-50d:
-        %-: Left-align the number in the given field.
-        50: Minimum field width of 50 characters.
-        d: Format as an integer.
- * 
- * @param student Pointer to the student structure.
- * @param student_index Index of the student in the array.
- */
-void display_student_info(struct Student *student, int student_index) {
-   
-    printf("\n================================================================================\n");
-    printf("                          STUDENT %d: %s                          \n", student_index + 1, student->name);
-    printf("================================================================================\n");
-    printf("| %-15s: %-50s |\n", "Department", student->department);
-    printf("| %-15s: %-50d |\n", "Roll Number", student->roll_number);
-    printf("================================================================================\n");
-    printf("                               COURSES AND SCORES                               \n");
-    printf("--------------------------------------------------------------------------------\n");
-
-    for (int j = 0; j < MAX_COURSES; j++) {
-        printf("| %-45s : %-10.2f |\n", student->courses[j], student->scores[j]);
-    }
-
-    printf("--------------------------------------------------------------------------------\n");
-    printf("| %-15s: %-10.2f                                    \n", "Average", student->average);
-    printf("| %-15s: %-50s \n", "Grade", student->grade);
-    printf("================================================================================\n");
+     printf("\033[0m"); // Reset text color
 }
