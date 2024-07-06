@@ -4,11 +4,14 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <unistd.h>
+
 
 
 #define MAX_STRING_LEN 100 // maximum length of a person's name
+#define MAX_ERROR_MSG_LEN 256
 #define MIN_STRING_LEN 5 
-#define ART_SIZE 2000
+#define ART_SIZE 1262
 #define TOTAL_SCORE 100
 #define MAX_COURSES 3
 #define PASS_THRESHOLD 55
@@ -41,6 +44,7 @@ struct Student *students = NULL;
 int student_count = 0;
 
 // Function prototypes
+bool repeat_action(char *action, int *response);
 void clear_terminal();
 void show_no_data_err(char *action);
 void show_header_art(char *header_string);
@@ -54,7 +58,9 @@ void add_student(struct Student **students_array, int *student_count);
 void display_all_students();
 void display_student_info(struct Student *student, int student_index);
 int get_main_program_choice();
+int search_by_roll();
 void clear_input_buffer() ;
+void show_found_student();
 
 int main() {
     /*
@@ -70,25 +76,40 @@ int main() {
     sprintf(welcome_user_msg,"          ----< WELCOME ABOARD %s! WHAT WOULD YOU LIKE TO DO? >----                 \n",user_name);
     show_header_art(welcome_user_msg);
 
-    int selected_operation = get_main_program_choice();
-    printf("Selected option %d\n", selected_operation);
-
-    switch (selected_operation)
+    while (true)
     {
-        case 1:
-            add_student(&students,&student_count);
-            display_all_students();
+        int selected_operation = get_main_program_choice();
+        // printf("Selected option %d\n", selected_operation);
+
+        switch (selected_operation)
+        {
+            case 1:
+                add_student(&students,&student_count);
+                break;
+            case 3:
+                display_all_students();
+                break;
+            case 5:
+                show_found_student();
+                break;
+            default:
+                break;
+        }
+
+        int do_action_again_response;
+        if(!repeat_action("perform another action",&do_action_again_response)){
             break;
-        case 2:
-            display_all_students();
-            break;
-        default:
-            break;
+        }
     }
 
     return 0;
 }
 
+/**
+ * @brief Shows the header art for an action to be performed(such as add, modify,etc)
+ * 
+ * @param header_string The message inside the header
+*/
 void show_header_art(char *header_string){
     printf("\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
     printf("@@                                                                                @@\n");
@@ -96,6 +117,13 @@ void show_header_art(char *header_string){
     printf("@@                                                                                @@\n");
     printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
 }
+
+/**
+ * @brief Clears new line from character input buffer
+ * When using scanf to get a character from the user, the compiler automatically adds a newline
+ * This function removes the newline to prevent errors in operation
+ * 
+*/
 void clear_input_buffer() {
     int c;
     while ((c = getchar()) != '\n' && c != EOF);
@@ -226,7 +254,7 @@ void validate_input_choices(char *prompt, enum DataType type, void *target, int 
 
         if (!is_valid_userchoice) {
             clear_terminal();
-            char error_msg[ART_SIZE];
+            char error_msg[MAX_ERROR_MSG_LEN - 156];
             sprintf(error_msg,"!!!      Please enter a valid %s from the options provided         !!!",target_string);
             show_error_art(error_msg);
 
@@ -289,7 +317,7 @@ void validate_input_data(const char *prompt, void *input_buffer, enum DataType t
     bool valid = false;
     char buffer[256];
     float score;
-    char error_msg[MAX_STRING_LEN * 2];
+    char error_msg[MAX_ERROR_MSG_LEN];
 
     while (!valid) {
         printf("%s", prompt);
@@ -351,6 +379,7 @@ void validate_input_data(const char *prompt, void *input_buffer, enum DataType t
  * @brief Gets the integer value representing the operation a user wants to perform, e.g.,
  * If they choose, 1, it means they want to add a student, if the choose 2, they want to update a record, and so on.
  *
+ * @return The number the user enters which represents the action they want to perform.
  */
 int get_main_program_choice() {
 
@@ -360,6 +389,7 @@ int get_main_program_choice() {
     char option_art[ART_SIZE];
     // printf("len opt: %d", len_options);
     // Store the ASCII art in the buffer
+    clear_terminal();
     sprintf(option_art,
         "\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n"
         "@@                                                                                @@\n"
@@ -575,11 +605,15 @@ void show_no_data_err(char *action){
  */
 void display_all_students() {
     int display_again;
+    char *header_msg;
     clear_terminal();
     if (student_count <= 0) {
         show_no_data_err("display");
         return;
     }
+    header_msg = "@@                  ----< DISPLAYING ALL THE STUDENTS RECORD >----                 n@@";
+    show_header_art(header_msg);
+    printf("\n");
     for (int i = 0; i < student_count; i++) {
         display_student_info(&students[i], i);
     }
@@ -631,4 +665,68 @@ void display_student_info(struct Student *student, int student_index) {
     printf("| %-15s: %-10.2f                                    \n", "Average", student->average);
     printf("| %-15s: %-50s \n", "Grade", student->grade);
     printf("================================================================================\n");
+}
+
+/**
+ * @brief Searches for a student by their roll number in the  array of students.
+ * 
+ * This function prompts the user to enter a roll number and searches through the array
+ * of available students to find a match. It prints a visual indication of progress
+ * while searching and returns the index of the student if found, otherwise returns -1.
+ * 
+ * @return int Index of the student in the array if found, -1 if not found or no students available.
+ */
+int search_by_roll() {
+    if (student_count > 0) {
+        int roll_num_to_search;
+        char *error_msg;
+        
+        // Prompt user for roll number input
+        validate_input_data("\n--> Enter the roll number to search for: ", &roll_num_to_search, INTEGER, 0, 0);
+        
+        printf("\n<<<<<<<<-- Please wait while I query the database: "); // Print initial message
+
+        // Simulate querying delay with visual feedback
+        bool found = false;
+        for (int i = 0; i < student_count; i++) {
+            printf("* "); // Visual feedback to indicate progress
+            fflush(stdout); // Flush stdout to ensure immediate printing of '*'
+            sleep(1);   // Simulate querying delay (replace with appropriate delay function)
+            
+            if (roll_num_to_search == students[i].roll_number) {
+                found = true;
+                return i; // Return index of the student if found
+            }
+        }
+        
+        // Print error message if student with roll number not found
+        if (!found) {
+            error_msg = "!!!              There is no student with that roll number              !!!\n!!!                    Please confirm and try again                     !!!" ;
+            show_error_art(error_msg);
+        }
+    } else {
+        show_no_data_err("search");
+    }
+    
+    return -1; // Return -1 indicating no match found
+}
+
+
+/**
+ * @brief Searches for a student by roll number and displays their information if found.
+ * 
+ * This function calls search_by_roll() to find a student by their roll number.
+ * If a student is found, it retrieves the student's information and displays it using
+ * display_student_info().
+ */
+void show_found_student() {
+    char *header_msg;
+    header_msg = "@@                 ---< SEARCHING FOR A STUDENT BY ROLL NUMBER >---               @@";
+    clear_terminal();
+    show_header_art(header_msg);
+    int student_index = search_by_roll();
+    if (student_index != -1) {
+        struct Student *found_student = &(students[student_index]);
+        display_student_info(found_student, student_index);
+    }
 }
