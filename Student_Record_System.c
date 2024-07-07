@@ -19,6 +19,7 @@
 #define FILE_EXTENSION ".json"
 
 const char *LOGO_FILE_NAME = "logo.txt";
+const char *GOODBYE_LOGO_FILE = "goodbye.txt";
 
 // Enum for data types
 enum DataType {
@@ -57,7 +58,7 @@ void sort_students(char *order);
 void auto_sort_save();
 void sort_operation();
 void show_success_message( char *msg);
-void update_course(struct Student *student, bool update_name);
+void update_course(struct Student *student, bool update_name,bool *modification_completed);
 void modify_student_data();
 void show_not_found_err_msg();
 void show_no_data_err(char *action);
@@ -80,6 +81,7 @@ void show_info_message(char *msg);
 void save_students_to_json(const char *json_file_name);
 void save_record_operation();
 void read_students_from_json(struct Student **all_students_array, int *total_students);
+void exit_program();
 
 int main() {
     /*
@@ -126,13 +128,17 @@ int main() {
             case 8:
                 read_students_from_json(&students,&student_count);
                 break;
+            case 9:
+                exit_program();
+                break;
             default:
                 break;
         }
 
         int do_action_again_response;
         if(!repeat_action("perform another action",&do_action_again_response)){
-            break;
+            exit_program();
+            //break;
         }
     }
     free(students);
@@ -140,6 +146,22 @@ int main() {
     return 0;
 }
 
+void exit_program(){
+    char *header_msg, *prompt;
+    int response;
+
+    header_msg = "@@                       ----<  EXIT THE ENTIRE PROGRAM  >----                    @@";
+    show_header_art(header_msg);
+
+    prompt = "\n--> Ensure you have saved your progress before exiting.\n--> Proceed to exit? Y/N: ";
+
+    validate_input_choices(prompt,STRING,yes_no_options,&response,2);
+    if (response == 'y'){
+        print_logo(GOODBYE_LOGO_FILE);
+        exit(1);
+    }
+
+}
 /**
  * @brief Shows the header art for an action to be performed(such as add, modify,etc)
  * 
@@ -169,12 +191,12 @@ void clear_input_buffer() {
         logo.txt.
  *
 */
-void print_logo() {
+void print_logo(const char *file_name) {
     char line[256];  // Store each line of the file in a string
     FILE *inFile;
 
     // Open the file
-    inFile = fopen(LOGO_FILE_NAME, "r");
+    inFile = fopen(file_name, "r");
     // Check if the file is available to be loaded
     if (inFile == NULL) {
         show_error_message(
@@ -208,7 +230,7 @@ void print_logo() {
 */
 void clear_terminal() {
     printf("\e[1;1H\e[2J"); 
-    print_logo();
+    print_logo(LOGO_FILE_NAME);
 }
 
 /**
@@ -714,20 +736,27 @@ void display_student_info(struct Student *student, int student_index) {
 int search_by_roll(char *purpose) {
     if (student_count > 0) {
         int roll_num_to_search;
-        // char *error_msg;
         char prompt[MAX_STRING_LEN];
         
         // Prompt user for roll number input
-        sprintf(prompt,"\n--> Enter the roll number to %s: ",purpose);
+        sprintf(prompt, "\n--> Enter the roll number to %s: ", purpose);
         validate_input_data(prompt, &roll_num_to_search, INTEGER, 0, 0);
-        
-        printf("\n<<<<<<<<-- Please wait while I query the database: "); // Print initial message
+
+        printf("\n<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
+        printf("\n<<                                                                     <<");
+        printf("\n<<        Please wait while I query the database for you               <<");
+        printf("\n<<                                                                     <<");
+        printf("\n<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
 
         // Simulate querying delay with visual feedback
         bool found = false;
         for (int i = 0; i < student_count; i++) {
-            printf("* "); // Visual feedback to indicate progress
-            fflush(stdout); // Flush stdout to ensure immediate printing of '*'
+            // Visual feedback to indicate progress
+            if (i % 4 == 0) {
+                printf("\n%-25c Searching: |",' ');
+            }
+            printf("===="); // Display progress bar
+            fflush(stdout); // Flush stdout to ensure immediate printing of progress bar
             sleep(1);   // Simulate querying delay (replace with appropriate delay function)
             
             if (roll_num_to_search == students[i].roll_number) {
@@ -735,6 +764,9 @@ int search_by_roll(char *purpose) {
                 return i; // Return index of the student if found
             }
         }
+        
+        // Complete the visual representation
+        printf("|\n");
         
         // Print error message if student with roll number not found
         if (!found) {
@@ -746,6 +778,7 @@ int search_by_roll(char *purpose) {
     
     return -1; // Return -1 indicating no match found
 }
+
 
 void show_not_found_err_msg(){
     char *error_msg;
@@ -791,6 +824,7 @@ void modify_student_data() {
     char *error_msg,*header_msg;
     int update_options[] = {1,2,3,4,5,6};
     int modify_again;
+    bool modification_completed = false;
 
     header_msg = "@@                 ----< MODIFYING A STUDENT'S RECORD >----                       @@";
     clear_terminal();
@@ -827,9 +861,11 @@ void modify_student_data() {
             switch (choice) {
                 case 1:
                     validate_input_data("\n--> Enter new name: ",student->name,STRING,MAX_STRING_LEN,MIN_STRING_LEN);
+                    modification_completed = true;
                     break;
                 case 2:
                     validate_input_data("\n--> Enter new department: ",student->department,STRING,MAX_STRING_LEN,MIN_STRING_LEN);
+                    modification_completed = true;
                     break;
                 case 3: {
                     int new_roll;
@@ -837,6 +873,7 @@ void modify_student_data() {
                         validate_input_data("\n--> Enter new roll number: ",&new_roll,INTEGER,0,0);
                         if (!is_duplicate_roll_num( new_roll)) {
                             student->roll_number = new_roll;
+                            modification_completed = true;
                             break;
                         } else {
                             error_msg = "\n!!!                          Invalid input                              !!!"
@@ -849,20 +886,25 @@ void modify_student_data() {
                     break;
                 }
                 case 4:
-                    update_course(student, true);//modify the name of a course
+                    update_course(student, true,&modification_completed);//modify the name of a course
+                    //modification_completed = true;
                     break;
                 case 5:
-                    update_course(student, false);//modify the score of a course
+                    update_course(student, false,&modification_completed);//modify the score of a course
+                    // modification_completed = true;
                     break;
                 case 6:
-                    exit(1);
+                    modification_completed = false;
+                    exit_program();
                     break;
                 default:
                     printf("Invalid choice!\n");
                     break;
             }
-            show_success_message("*               Successfully updated the student's record               *");
-            auto_sort_save();// auto sort and save the records after modifying score(s) of the course(s) of a student's record(auto save is coming soon!!!!!)
+            if (modification_completed){
+                show_success_message("*               Successfully updated the student's record               *");
+                auto_sort_save();// auto sort and save the records after modifying score(s) of the course(s) of a student's record(auto save is coming soon!!!!!)
+            }
             if (repeat_action("modify a record again",&modify_again)){
                 modify_student_data();
             }
@@ -881,9 +923,9 @@ void modify_student_data() {
  * @param student Pointer to the student to be updated.
  * @param update_name Boolean indicating whether to update the course name (true) or score (false).
  */
-void update_course(struct Student *student, bool update_name) {
+void update_course(struct Student *student, bool update_name,bool *modification_completed) {
     int course_num;
-    int course_options[] = {1,2,3};
+    int course_options[MAX_COURSES + 1];
     char *header_msg;
     char prompt[MAX_MSG_LEN];
 
@@ -895,27 +937,38 @@ void update_course(struct Student *student, bool update_name) {
     printf("-------------------------------------------------------------------------------------\n");
     show_header_art(header_msg);
     printf("\n");
-    for (int j = 0; j < MAX_COURSES; j++) {
-        printf("%-25c %d. %-15s : %-15.2f \n", ' ', j + 1,student->courses[j], student->scores[j]);
+    for (int j = 0; j < MAX_COURSES + 1; j++) {
+        course_options[j] = j + 1;
+        if (j < MAX_COURSES){
+            printf("%-25c %d. %-15s : %-15.2f \n", ' ', j + 1,student->courses[j], student->scores[j]);
+        }
     }
+    printf("%-25c %d. %-15s",' ',MAX_COURSES + 1,"Exit");
     
     validate_input_choices( "\n--> Please type a number to select an option from above: ",INTEGER,course_options,&course_num,sizeof(course_options)/sizeof(course_options[0]));
     course_num--;  // Convert to 0-based index
 
     // Update course name or score based on input
-    if (update_name) {
+    if (course_num < MAX_COURSES){
+        if (update_name) {
         header_msg = "@@                     ----<  UPDATING COURSE NAME  >----                          @@";
         show_header_art(header_msg);
         sprintf(prompt,"\n--> Enter new course name (old name is %s): ",student->courses[course_num]);
         validate_input_data(prompt,student->courses[course_num],STRING,MAX_STRING_LEN,MIN_STRING_LEN);
-    } else {
-        header_msg = "@@                  ----<   UPDATING THE COURSE SCORE  >----                       @@";
-        show_header_art(header_msg);
-        sprintf(prompt,"\n--> Enter new course name (old score for the course %s is %.2f): ",student->courses[course_num],student->scores[course_num]);
-        validate_input_data(prompt,&student->scores[course_num],SCORE,sizeof(float),0);
+        *modification_completed = true;
+        } else {
+            header_msg = "@@                  ----<   UPDATING THE COURSE SCORE  >----                       @@";
+            show_header_art(header_msg);
+            sprintf(prompt,"\n--> Enter new course name (old score for the course %s is %.2f): ",student->courses[course_num],student->scores[course_num]);
+            validate_input_data(prompt,&student->scores[course_num],SCORE,sizeof(float),0);
+            *modification_completed = true;
+        }
 
+    }else{
+        *modification_completed = false;
+        exit_program();
     }
-
+    
     // Update average score and grade
     student->average = 0.0f;
     for (int i = 0; i < MAX_COURSES; i++) {
@@ -983,7 +1036,7 @@ void delete_a_student() {
             show_success_message("*                     Student removed successfully!                      *");
             auto_sort_save(); // auto sort and save the records after deleting(auto save is coming soon!!!!!)
         } else {
-            show_info_message("*                           Deletion canceled!                           *");
+            show_info_message("*                       Deletion canceled!                              *");
         }
     }else {
         show_not_found_err_msg();
@@ -1073,7 +1126,7 @@ void delete_action() {
                 delete_all_students();
                 break;
             case 3:
-                exit(1);
+                exit_program();
                 break;
             default:
                 printf("Invalid choice.\n"); //this line is negligible because checking for invalid option 
@@ -1237,6 +1290,8 @@ void sort_operation() {
         } else if (user_order == 2) {
             auto_sort_order = "descending";
             sort_students(auto_sort_order); // Sort in descending order
+        }else {
+            exit_program();
         }
 
         auto_sort = true; // Set auto_sort to true after sorting operation
