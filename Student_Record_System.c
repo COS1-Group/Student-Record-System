@@ -80,7 +80,7 @@ void show_info_message(char *msg);
 void save_students_to_json(const char *json_file_name);
 void save_record_operation();
 void read_students_from_json(struct Student **all_students_array, int *total_students);
-void exit_program();
+bool exit_program();
 
 
 /**
@@ -96,6 +96,7 @@ int main() {
     char welcome_user_msg[90 + strlen(user_name)]; 
     sprintf(welcome_user_msg,"          ----< WELCOME ABOARD %s! WHAT WOULD YOU LIKE TO DO? >----                 \n",user_name);
     show_header_art(welcome_user_msg);
+    bool exit_requested = false;
 
     while (true)
     {
@@ -129,7 +130,11 @@ int main() {
                 read_students_from_json(&students,&student_count);
                 break;
             case 9:
-                exit_program();
+                exit_requested = exit_program();
+                if (exit_requested){
+                    free(students);
+                    exit(0);
+                }
                 break;
             default:
                 break;
@@ -137,12 +142,10 @@ int main() {
 
         int do_action_again_response;
         if(!repeat_action("perform another action",&do_action_again_response)){
-            exit_program();
-            //break;
+            free(students); // Free the memory allocated to students after the while loop
+            break; 
         }
     }
-    free(students); // free the memory allocated to the students array
-
     return 0;
 }
 
@@ -153,7 +156,7 @@ int main() {
  * It ensures the user has the opportunity to save their progress before exiting.
  * If the user confirms, it displays a goodbye message and exits the program.
  */
-void exit_program() {
+bool exit_program() {
     char *header_msg, *prompt;
     int response;
 
@@ -166,7 +169,9 @@ void exit_program() {
     validate_input_choices(prompt, STRING, yes_no_options, &response, 2);
     if (response == 'y') {
         print_logo(GOODBYE_LOGO_FILE);  // Display the goodbye message
-        exit(1);  // Exit the program
+        return true; // User confirmed exit
+    }else {
+        return false; // User chose not to exit
     }
 }
 
@@ -887,7 +892,9 @@ void modify_student_data() {
                     break;
                 case 6:
                     modification_completed = false;
-                    exit_program();
+                    if (exit_program()){
+                        exit(0);
+                    }
                     break;
                 default:
                     printf("Invalid choice!\n");
@@ -961,7 +968,9 @@ void update_course(struct Student *student, bool update_name,bool *modification_
 
     }else{// the user entered a number equal to exit option
         *modification_completed = false;
-        exit_program();
+        if (exit_program()){
+            exit(0);
+        };
     }
     
     // Update average score and grade
@@ -1119,7 +1128,9 @@ void delete_action() {
                 delete_all_students();
                 break;
             case 3:
-                exit_program();
+                if (exit_program()){
+                    exit(0);
+                };
                 break;
             default:
                 printf("Invalid choice.\n"); //this line is negligible because checking for invalid option 
@@ -1229,7 +1240,9 @@ void sort_operation() {
             auto_sort_order = "descending";
             sort_students(auto_sort_order); // Sort in descending order
         }else {
-            exit_program();
+            if (exit_program()){
+                exit(0);
+            };
         }
 
         auto_sort = true; // Set auto_sort to true after sorting operation
