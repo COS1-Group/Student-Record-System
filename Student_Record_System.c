@@ -5,7 +5,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <unistd.h>
-
+#include <json-c/json.h> 
 
 
 #define MAX_STRING_LEN 100 // maximum length of a person's name
@@ -16,6 +16,7 @@
 #define MAX_COURSES 3
 #define PASS_THRESHOLD 55
 #define TOTAL_SCORE 100
+#define FILE_EXTENSION ".json"
 
 const char *LOGO_FILE_NAME = "logo.txt";
 
@@ -44,6 +45,7 @@ char yes_no_options[] = { 'y','n'};
 int student_count = 0;
 bool greet_user = true;
 char *auto_sort_order;
+char json_file_name[MAX_STRING_LEN];
 bool auto_sort;
 bool auto_save;
 
@@ -75,6 +77,9 @@ void clear_input_buffer() ;
 void show_found_student();
 void delete_action();
 void show_info_message(char *msg);
+void save_students_to_json(const char *json_file_name);
+void save_record_operation();
+void read_students_from_json(struct Student **all_students_array, int *total_students);
 
 int main() {
     /*
@@ -114,6 +119,12 @@ int main() {
                 break;
             case 6:
                 sort_operation();
+                break;
+            case 7:
+                save_record_operation();
+                break;
+            case 8:
+                read_students_from_json(&students,&student_count);
                 break;
             default:
                 break;
@@ -842,7 +853,6 @@ void modify_student_data() {
                     break;
                 case 5:
                     update_course(student, false);//modify the score of a course
-                    auto_sort_save();// auto sort and save the records after modifying score(s) of the course(s) of a student's record(auto save is coming soon!!!!!)
                     break;
                 case 6:
                     exit(1);
@@ -852,6 +862,7 @@ void modify_student_data() {
                     break;
             }
             show_success_message("*               Successfully updated the student's record               *");
+            auto_sort_save();// auto sort and save the records after modifying score(s) of the course(s) of a student's record(auto save is coming soon!!!!!)
             if (repeat_action("modify a record again",&modify_again)){
                 modify_student_data();
             }
@@ -1092,7 +1103,7 @@ void show_info_message(char *msg) {
     printf("*                                                                       *\n");
     printf("*                          INFORMATION:                                 *\n");
     printf("*                                                                       *\n");
-    printf("    %s\n", msg);
+    printf("%s\n", msg);
     printf("*                                                                       *\n");
     printf("*************************************************************************\n");
     printf("\033[0m"); // Reset text color
@@ -1127,7 +1138,7 @@ void show_no_data_err(char *action){
 }
 
 /**
- * Compare function for sorting students in ascending order based on average.
+ *@brief Compare function for sorting students in ascending order based on average.
  * 
  * @param a Pointer to the first student.
  * @param b Pointer to the second student.
@@ -1147,7 +1158,7 @@ int compare_funct_ascend(const void *a, const void *b) {
 }
 
 /**
- * Compare function for sorting students in descending order based on average.
+ *@brief Compare function for sorting students in descending order based on average.
  * 
  * @param a Pointer to the first student.
  * @param b Pointer to the second student.
@@ -1167,7 +1178,7 @@ int compare_funct_descend(const void *a, const void *b) {
 }
 
 /**
- * Sorts an array of students based on their average score.
+ * @brief Sorts an array of students based on their average score.
  * 
  * @param order The order to sort by: 1 for ascending, 2 for descending.
  * @param all_stud Pointer to the array of students.
@@ -1188,10 +1199,14 @@ void sort_students(char *order) {
     }
 }
 
-void sort_operation(){
+/**
+ *@brief Performs sorting operations on the array of students based on user input.
+ * Allows sorting in ascending or descending order of average marks.
+ */
+void sort_operation() {
     char *header_msg, *prompt;
     int user_order;
-    int order_options[] = {1,2,3};
+    int order_options[] = {1, 2, 3};
     int sort_again;
     char success_msg[MAX_MSG_LEN];
 
@@ -1212,28 +1227,281 @@ void sort_operation(){
             "@@                                                                                @@\n"
             "           --> Please type a number to select an option from above: ";
 
-        validate_input_choices(prompt,INTEGER,order_options,&user_order,3);
-        auto_sort = true;
-        if (user_order == 1){
+        // Get user input for sort order
+        validate_input_choices(prompt, INTEGER, order_options, &user_order, 3);
+
+        // Perform sorting based on user selection
+        if (user_order == 1) {
             auto_sort_order = "ascending";
-            sort_students(auto_sort_order);
-        }else if (user_order == 2){
+            sort_students(auto_sort_order); // Sort in ascending order
+        } else if (user_order == 2) {
             auto_sort_order = "descending";
-            sort_students(auto_sort_order);
+            sort_students(auto_sort_order); // Sort in descending order
         }
-        sprintf(success_msg,"*      Successfully sorted the student records in %s order      *",auto_sort_order);
+
+        auto_sort = true; // Set auto_sort to true after sorting operation
+
+        // Display success message
+        sprintf(success_msg, "*      Successfully sorted the student records in %s order      *", auto_sort_order);
         show_success_message(success_msg);
-        if (repeat_action("sort records by a different order",&sort_again)){
-            sort_operation();
+
+        // Check if user wants to sort records again
+        if (repeat_action("sort records by a different order", &sort_again)) {
+            sort_operation(); // Recursive call to sort_operation if user wants to sort again
         }
-    }else {
-        show_no_data_err("sort");
+    } else {
+        show_no_data_err("sort"); // Display error message if no student records found
     }
-    
 }
 
-void auto_sort_save(){
-    if (auto_sort){
-        sort_students(auto_sort_order);
+/**
+ *@brief Automatically sorts and save student records if auto_sort and/or auto_save flags are set to true.
+ */
+void auto_sort_save() {
+    if (auto_sort) {
+        sort_students(auto_sort_order); // Sort students based on auto_sort_order
     }
+    if (auto_save){
+        save_students_to_json(json_file_name);
+    }
+}
+
+/**
+ * Converts a student structure to a JSON object.
+ *
+ * @param student Pointer to the student structure to convert.
+ * @return A JSON object representing the student data.
+ */
+json_object *student_to_json(struct Student *student) {
+    // Create a new JSON object for the student
+    json_object *jstudent = json_object_new_object();
+
+    // Add student attributes to the JSON object
+    json_object_object_add(jstudent, "name", json_object_new_string(student->name));
+    json_object_object_add(jstudent, "department", json_object_new_string(student->department));
+    json_object_object_add(jstudent, "roll_number", json_object_new_int(student->roll_number));
+    
+    // Create a JSON array for courses
+    json_object *jcourses = json_object_new_array();
+    for (int i = 0; i < MAX_COURSES; i++) {
+        // Create a JSON object for each course
+        json_object *jcourse = json_object_new_object();
+        json_object_object_add(jcourse, "course_name", json_object_new_string(student->courses[i]));
+
+        // Format the score with limited precision
+        char score_str[10];
+        snprintf(score_str, sizeof(score_str), "%.2f", student->scores[i]);
+        json_object_object_add(jcourse, "score", json_object_new_double_s(student->scores[i], score_str));
+        
+        // Add course object to courses array
+        json_object_array_add(jcourses, jcourse);
+    }
+    // Add courses array to student JSON object
+    json_object_object_add(jstudent, "courses", jcourses);
+
+    // Format average with limited precision
+    char average_str[10];
+    snprintf(average_str, sizeof(average_str), "%.2f", student->average);
+    json_object_object_add(jstudent, "average", json_object_new_double_s(student->average, average_str));
+    
+    // Add grade to student JSON object
+    json_object_object_add(jstudent, "grade", json_object_new_string(student->grade));
+
+    return jstudent; // Return the created student JSON object
+}
+
+/**
+ *@brief Saves students' records to a JSON file.
+ *
+ * @param json_file_name File path where the JSON data will be saved.
+ */
+void save_students_to_json(const char *json_file_name) {
+    // Create the main JSON object to hold all information
+    json_object *jobj = json_object_new_object();
+    // Add a description to the JSON object
+    json_object_object_add(jobj, "description", json_object_new_string("All records for Students"));
+
+    // Add the total number of students to the JSON object
+    json_object_object_add(jobj, "total_students", json_object_new_int(student_count));
+    // Create a new JSON array object
+    json_object *jstudents = json_object_new_array();
+
+    // Iterate through each student and convert to JSON
+    for (int i = 0; i < student_count; i++) {
+        json_object *jstudent = student_to_json(&students[i]); // Convert student to JSON object
+        json_object_array_add(jstudents, jstudent); // Add student JSON object to array
+    }
+
+     // Add the array of student records to the main JSON object
+    json_object_object_add(jobj, "records", jstudents);
+    // Convert JSON array to a formatted JSON string
+    const char *json_str = json_object_to_json_string_ext(jobj, JSON_C_TO_STRING_PRETTY);
+
+    // Open the file for writing
+    FILE *fp = fopen(json_file_name, "w");
+    if (fp == NULL) {
+        printf("!!!Failed to open file for writing!!!\n");
+        return;
+    }
+
+    // Write the JSON string to the file
+    fprintf(fp, "%s", json_str);
+    fclose(fp);
+
+    // Free the JSON object
+    json_object_put(jstudents);
+}
+
+/**
+ * @brief Saves student records to a JSON file and sets the auto-save option.
+ * 
+ * This function prompts the user to enter a file name for saving student records to a JSON file.
+ * It also provides an option to enable or disable auto-saving when any modification is made to the records.
+ */
+void save_record_operation() {
+    char *header_msg, *prompt;
+    char success_msg[MAX_MSG_LEN];
+    int to_auto_save;
+    clear_terminal();  // Clear the terminal screen
+
+    // Display header message
+    header_msg = "@@                    ----<  SAVING RECORDS TO JSON FILE  >----                  @@\n";
+    show_header_art(header_msg);
+
+    if (student_count > 0) {  // Check if there are student records to save
+        // Prompt user to enter the name of the file to save records to
+        validate_input_data("\n--> Please type in the name of the file you want to save records to: ", json_file_name, STRING, MAX_STRING_LEN, MIN_STRING_LEN);
+        strcat(json_file_name, FILE_EXTENSION);  // Append file extension
+
+        // Save student records to the specified JSON file
+        save_students_to_json(json_file_name);
+        // Create a success message
+        sprintf(success_msg, "           Successfully saved the records to %s            ", json_file_name);
+        // Display the success message
+        show_success_message(success_msg);
+    } else {
+        // Display error message if there are no student records to save
+        show_no_data_err("save");
+    }
+
+    // Prompt user to enable or disable auto-save feature
+    validate_input_choices("\n--> Would you like to auto save records when any modification is made? Y/N: ", STRING, yes_no_options, &to_auto_save, 2);
+    if (to_auto_save == 'y') {
+        auto_save = true;  // Enable auto-save
+    } else {
+        auto_save = false;  // Disable auto-save
+    }
+}
+
+/**
+ * Reads students' records from a JSON file and populates the students array.
+ * 
+ * @param all_students_array Pointer to the pointer of the array of students.
+ * @param total_students Pointer to the variable holding the total number of students.
+ */
+void read_students_from_json(struct Student **all_students_array, int *total_students) {
+    char read_json_filename[MAX_STRING_LEN]; // Allocate memory for the read_json_filename
+
+    // Prompt user for read_json_filename
+    validate_input_data("\n--> Enter the file name to read the records from (the file is expected to be in JSON format): ", read_json_filename, STRING, MAX_STRING_LEN, MIN_STRING_LEN);
+    strcat(read_json_filename, FILE_EXTENSION); // Append file extension
+
+    // Open the file for reading
+    FILE *fp = fopen(read_json_filename, "r");
+    if (fp == NULL) {
+        show_error_message("\n!!!                    Failed to open file for reading                   !!!\n");
+        return;
+    }
+
+    // Read the entire file into a buffer
+    fseek(fp, 0, SEEK_END);
+    long file_size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    char *json_buffer = (char *)malloc(file_size + 1);
+    fread(json_buffer, 1, file_size, fp);
+    fclose(fp);
+
+    // Parse the JSON buffer
+    json_object *jobj = json_tokener_parse(json_buffer);
+    free(json_buffer);
+
+    if (jobj == NULL) {
+        show_error_message("\n!!!                          Failed to parse JSON                        !!!\n");
+        return;
+    }
+
+    // Extract main fields
+    json_object *jdescription, *jtotal_students, *jrecords;
+    if (!json_object_object_get_ex(jobj, "description", &jdescription) ||
+        !json_object_object_get_ex(jobj, "total_students", &jtotal_students) ||
+        !json_object_object_get_ex(jobj, "records", &jrecords)) {
+        show_error_message("\n!!!                    Invalid JSON format: Missing fields               !!!");
+        json_object_put(jobj);
+        return;
+    }
+
+    // Get the array of student records
+    int num_students = json_object_array_length(jrecords);
+    struct Student *parsed_students = (struct Student *)malloc(num_students * sizeof(struct Student));
+
+    // Iterate through each student object in the JSON array
+    for (int i = 0; i < num_students; i++) {
+        json_object *jstudent = json_object_array_get_idx(jrecords, i); // Get a student's data (structure or object)
+        if (jstudent != NULL) {
+            // Parse each student object
+            struct Student new_student;
+            json_object *jname, *jdept, *jroll, *jcourses_array, *javerage, *jgrade;
+            if (json_object_object_get_ex(jstudent, "name", &jname) &&
+                json_object_object_get_ex(jstudent, "department", &jdept) &&
+                json_object_object_get_ex(jstudent, "roll_number", &jroll) &&
+                json_object_object_get_ex(jstudent, "courses", &jcourses_array) &&
+                json_object_object_get_ex(jstudent, "average", &javerage) &&
+                json_object_object_get_ex(jstudent, "grade", &jgrade)) {
+
+                // Copy student data values from JSON object to the new_student structure
+                strncpy(new_student.name, json_object_get_string(jname), MAX_STRING_LEN - 1);
+                new_student.name[MAX_STRING_LEN - 1] = '\0';
+
+                strncpy(new_student.department, json_object_get_string(jdept), MAX_STRING_LEN - 1);
+                new_student.department[MAX_STRING_LEN - 1] = '\0';
+
+                new_student.roll_number = json_object_get_int(jroll);
+
+                // Process courses array for the student
+                int num_courses = json_object_array_length(jcourses_array);
+                for (int j = 0; j < num_courses && j < MAX_COURSES; j++) {
+                    json_object *jcourse = json_object_array_get_idx(jcourses_array, j);
+                    if (jcourse != NULL) {
+                        json_object *jcourse_name, *jcourse_score;
+                        if (json_object_object_get_ex(jcourse, "course_name", &jcourse_name) &&
+                            json_object_object_get_ex(jcourse, "score", &jcourse_score)) {
+
+                            // Copy course name and score to new_student
+                            strncpy(new_student.courses[j], json_object_get_string(jcourse_name), MAX_STRING_LEN - 1);
+                            new_student.courses[j][MAX_STRING_LEN - 1] = '\0';
+
+                            new_student.scores[j] = json_object_get_double(jcourse_score);
+                        }
+                    }
+                }
+
+                new_student.average = json_object_get_double(javerage);
+
+                strncpy(new_student.grade, json_object_get_string(jgrade), MIN_STRING_LEN - 1);
+                new_student.grade[MIN_STRING_LEN - 1] = '\0';
+
+                // Add the parsed student to the array
+                parsed_students[i] = new_student;
+            }
+        }
+    }
+
+    // Assign the parsed students to the main array
+    free(*all_students_array); // Free existing students array
+    *all_students_array = parsed_students; // Assign parsed students array
+    *total_students = num_students; // Update student count
+
+    // Free the JSON object
+    json_object_put(jobj);
 }
