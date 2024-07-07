@@ -19,6 +19,7 @@ If you are running your c program in a linux environment like you can easily ins
 sudo apt update
 sudo apt install libjson-c-dev
 ```
+
 ```bash
 # For RedHat-based Distributions (like CentOS)
 sudo yum install json-c json-c-devel
@@ -29,16 +30,17 @@ However, the easiest solution may be to enable Windows subsystem for Linux (WSL)
 
 ## Run Program
 
-You can easily run the program by using the command:
+You can easily run the program by cloning this repository (note that only collaborators can have access to this repository):
+
 ```bash
 git clone https://github.com/COS1-Group/Student-Record-System.git
 ```
-But note that only collaborators can have access to this repository. Then compile the program like so:
+
+Then compile the program like so:
 
 ```bash
 gcc Student_Record_System.c -o Student_Record_System.exe -ljson-c # the flag -ljson-c is essential to link the json-c API to the program
 ```
-
 Then to run the program:
 
 ```bash
