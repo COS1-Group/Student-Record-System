@@ -5,9 +5,9 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <json-c/json.h> 
+#include <json-c/json.h> // needed for the json-c API
 
-
+// Constants
 #define MAX_STRING_LEN 100 // maximum length of a person's name
 #define MAX_MSG_LEN 256
 #define MIN_STRING_LEN 5 
@@ -41,17 +41,16 @@ struct Student {
 };
 
 //Global variables
-struct Student *students = NULL;
+struct Student *students = NULL; //pointer to the array of all students
 char yes_no_options[] = { 'y','n'};
-int student_count = 0;
-bool greet_user = true;
+int student_count = 0; //total number of students
+bool greet_user = true; // essential to only greet user when program runs the first time
 char *auto_sort_order;
 char json_file_name[MAX_STRING_LEN];
 bool auto_sort;
 bool auto_save;
 
-
-// Function prototypes
+// Function prototypes(not in any order)
 bool repeat_action(char *action, int *response);
 void clear_terminal();
 void sort_students(char *order);
@@ -75,7 +74,7 @@ void display_student_info(struct Student *student, int student_index);
 int get_main_program_choice();
 int search_by_roll(char *purpose);
 void clear_input_buffer() ;
-void show_found_student();
+void search_student_by_roll_num();
 void delete_action();
 void show_info_message(char *msg);
 void save_students_to_json(const char *json_file_name);
@@ -83,10 +82,11 @@ void save_record_operation();
 void read_students_from_json(struct Student **all_students_array, int *total_students);
 void exit_program();
 
+
+/**
+ * @brief This is the main function that runs the entire program.
+*/
 int main() {
-    /*
-        This is the main function that runs the entire program.
-    */
     clear_terminal(); // Clear the terminal and print logo
 
     char user_name[MAX_STRING_LEN];
@@ -117,7 +117,7 @@ int main() {
                 delete_action();
                 break;
             case 5:
-                show_found_student();
+                search_student_by_roll_num();
                 break;
             case 6:
                 sort_operation();
@@ -141,27 +141,35 @@ int main() {
             //break;
         }
     }
-    free(students);
+    free(students); // free the memory allocated to the students array
 
     return 0;
 }
 
-void exit_program(){
+/**
+ *@brief Prompts the user to confirm if they want to exit the program.
+ * 
+ * This function displays a confirmation prompt to the user asking if they want to exit the program.
+ * It ensures the user has the opportunity to save their progress before exiting.
+ * If the user confirms, it displays a goodbye message and exits the program.
+ */
+void exit_program() {
     char *header_msg, *prompt;
     int response;
 
     header_msg = "@@                       ----<  EXIT THE ENTIRE PROGRAM  >----                    @@";
-    show_header_art(header_msg);
+    show_header_art(header_msg);  
 
     prompt = "\n--> Ensure you have saved your progress before exiting.\n--> Proceed to exit? Y/N: ";
 
-    validate_input_choices(prompt,STRING,yes_no_options,&response,2);
-    if (response == 'y'){
-        print_logo(GOODBYE_LOGO_FILE);
-        exit(1);
+    // Validate the user's response (Y/N)
+    validate_input_choices(prompt, STRING, yes_no_options, &response, 2);
+    if (response == 'y') {
+        print_logo(GOODBYE_LOGO_FILE);  // Display the goodbye message
+        exit(1);  // Exit the program
     }
-
 }
+
 /**
  * @brief Shows the header art for an action to be performed(such as add, modify,etc)
  * 
@@ -187,9 +195,8 @@ void clear_input_buffer() {
 }
 
 /**
- * @brief  This function prints the program's logo from a file named
-        logo.txt.
- *
+ *@brief  This function prints the  logos from a file 
+ *@param file_name The name of the file where the logo is stored
 */
 void print_logo(const char *file_name) {
     char line[256];  // Store each line of the file in a string
@@ -307,7 +314,7 @@ void validate_input_choices(char *prompt, enum DataType type, void *target, int 
             }
         }
 
-        if (!is_valid_userchoice) {
+        if (!is_valid_userchoice) {// the user did not enter a value available in the list of choices
             clear_terminal();
             char error_msg[MAX_MSG_LEN];
             sprintf(
@@ -375,7 +382,7 @@ bool is_alphanumeric_or_alphabetic(const char *str) {
 
 void validate_input_data(const char *prompt, void *input_buffer, enum DataType type, int max_length, int min_length) {
     bool valid = false;
-    char buffer[256];
+    char buffer[256]; //temporary buffer variable to store inputs before transferring to the real input_buffer variable
     float score;
     char error_msg[MAX_MSG_LEN *2];
 
@@ -625,7 +632,7 @@ void add_student(struct Student **students_array, int *student_count) {
             snprintf(sen, sizeof(sen), "\n--> Enter course name for course %d: ", i + 1);
             validate_input_data(sen, course_name, STRING, MAX_STRING_LEN, MIN_STRING_LEN);
             duplicate_course = is_duplicate_course(new_student, course_name);
-            printf("%d",duplicate_course);
+            // printf("%d",duplicate_course);
             if (!duplicate_course) {
                 strncpy(new_student->courses[i], course_name, MAX_STRING_LEN);
                 break;
@@ -763,11 +770,7 @@ int search_by_roll(char *purpose) {
                 found = true;
                 return i; // Return index of the student if found
             }
-        }
-        
-        // Complete the visual representation
-        printf("|\n");
-        
+        }       
         // Print error message if student with roll number not found
         if (!found) {
             show_not_found_err_msg();
@@ -779,17 +782,6 @@ int search_by_roll(char *purpose) {
     return -1; // Return -1 indicating no match found
 }
 
-
-void show_not_found_err_msg(){
-    char *error_msg;
-    error_msg = "\n!!!                          Invalid input                              !!!"
-                "\n!!!                                                                     !!!"
-                "\n!!!              There is no student with that roll number              !!!"
-                "\n!!!                    Please confirm and try again                     !!!" ;
-    show_error_message(error_msg);
-
-}
-
 /**
  * @brief Searches for a student by roll number and displays their information if found.
  * 
@@ -797,7 +789,7 @@ void show_not_found_err_msg(){
  * If a student is found, it retrieves the student's information and displays it using
  * display_student_info().
  */
-void show_found_student() {
+void search_student_by_roll_num() {
     char *header_msg;
     int search_again;
     header_msg = "@@                 ---< SEARCHING FOR A STUDENT BY ROLL NUMBER >---               @@";
@@ -810,12 +802,12 @@ void show_found_student() {
     }
 
     if (repeat_action("search for another record",&search_again)){
-            show_found_student();
+            search_student_by_roll_num();
         }
 }
 
 /**
- * Modifies student data based on user input.
+ *@brief Modifies student data based on user input.
  *
  * The function first searches for the student by roll number, displays the student information
  * Then user can modify whatever they want
@@ -922,6 +914,7 @@ void modify_student_data() {
  *
  * @param student Pointer to the student to be updated.
  * @param update_name Boolean indicating whether to update the course name (true) or score (false).
+ * @param modification_completed Boolean indicating whether an update was successfully made. This is need to know when to display the success message
  */
 void update_course(struct Student *student, bool update_name,bool *modification_completed) {
     int course_num;
@@ -938,18 +931,20 @@ void update_course(struct Student *student, bool update_name,bool *modification_
     show_header_art(header_msg);
     printf("\n");
     for (int j = 0; j < MAX_COURSES + 1; j++) {
-        course_options[j] = j + 1;
+        course_options[j] = j + 1; //add values to the course options array depending on the total max course and 1 is added for an additional option for Exit
         if (j < MAX_COURSES){
+            // options for courses alone, skips last option which is for exit
             printf("%-25c %d. %-15s : %-15.2f \n", ' ', j + 1,student->courses[j], student->scores[j]);
         }
     }
-    printf("%-25c %d. %-15s",' ',MAX_COURSES + 1,"Exit");
+    printf("%-25c %d. %-15s",' ',MAX_COURSES + 1,"Exit"); // show exit option
     
     validate_input_choices( "\n--> Please type a number to select an option from above: ",INTEGER,course_options,&course_num,sizeof(course_options)/sizeof(course_options[0]));
     course_num--;  // Convert to 0-based index
 
     // Update course name or score based on input
-    if (course_num < MAX_COURSES){
+    if (course_num < MAX_COURSES){ // The user entered a number equal to the options of courses 
+        // if the course option array is {1,2,3,4}, options 1 to 3 represents courses and option 4 represents exit option
         if (update_name) {
         header_msg = "@@                     ----<  UPDATING COURSE NAME  >----                          @@";
         show_header_art(header_msg);
@@ -964,7 +959,7 @@ void update_course(struct Student *student, bool update_name,bool *modification_
             *modification_completed = true;
         }
 
-    }else{
+    }else{// the user entered a number equal to exit option
         *modification_completed = false;
         exit_program();
     }
@@ -975,13 +970,12 @@ void update_course(struct Student *student, bool update_name,bool *modification_
         student->average += student->scores[i];
     }
     student->average /= MAX_COURSES;
-
     strcpy(student->grade, student->average >= PASS_THRESHOLD ? "Pass" : "Fail");
    
 }
 
 /**
- * Deletes a single student from the list of students.
+ *@brief Deletes a single student from the list of students.
  *
  */
 void delete_a_student() {
@@ -1002,16 +996,15 @@ void delete_a_student() {
 
         // Display student information
         display_student_info(student,index_of_student);
-        printf("\n\033[1;33m"); // Set text color to yellow
         sprintf(warning_msg,
-            "\n\033[1;33m" // Set text color to yellow
+            "\n\033[1;33m" // Set text colour to yellow
             "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
             "\n!!!                                                                     !!!"
             "\n!!!                              WARINING:                              !!!"
             "\n!!!                                                                     !!!"
             "\n                 This will delete %s's data permanently                      "
             "\n                   Do you want to proceed!!!? Y/N: "
-            "\033[0m",
+            "\033[0m",//Reset text colour
             student->name
         );
         
@@ -1048,7 +1041,7 @@ void delete_a_student() {
 }
 
 /**
- * Deletes all students from the list of students.
+ *@brief Deletes all students from the list of students.
  * 
  * This function prompts the user with a warning message about deleting all student records permanently.
  * If the user confirms the action by typing 'y', it frees the memory allocated for the student records,
@@ -1098,7 +1091,7 @@ void delete_all_students() {
 }
 
 /**
- * Handles the deletion actions based on user input: delete a single student or all students.
+ *@brief Handles the deletion actions based on user input: delete a single student or all students.
  *
  */
 void delete_action() {
@@ -1136,58 +1129,6 @@ void delete_action() {
     } else {
         show_no_data_err("delete");
     }
-}
-
-void show_success_message(char *msg) {
-    printf("\n\033[1;32m"); // Set text color to green
-    printf("*************************************************************************\n");
-    printf("*                                                                       *\n");
-    printf("*                          SUCCESS:                                     *\n");
-    printf("*                                                                       *\n");
-    printf("%s\n", msg);
-    printf("*                                                                       *\n");
-    printf("*************************************************************************\n");
-    printf("\033[0m"); // Reset text color
-}
-
-void show_info_message(char *msg) {
-    printf("\n\033[1;34m"); // Set text color to blue
-    printf("*************************************************************************\n");
-    printf("*                                                                       *\n");
-    printf("*                          INFORMATION:                                 *\n");
-    printf("*                                                                       *\n");
-    printf("%s\n", msg);
-    printf("*                                                                       *\n");
-    printf("*************************************************************************\n");
-    printf("\033[0m"); // Reset text color
-}
-
-/**
- * @brief Display error message for empty student record
- * 
- * If user tries to display,modify,delete or search records and the student array is empty(no record added),
- * This function tells user that no data exists for the action to be performed.
- * @param action The action being performed, e.g., display , delete, modify and search.
-*/
-void show_no_data_err(char *action){
-    printf("\n\033[1;31m"); // Set text color to red
-    printf("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-    printf("!!!                                                                     !!!\n");
-    printf("!!!                              ERROR:                                 !!!\n");
-    printf("!!!                                                                     !!!\n");
-    if(strlen(action) == 7){// if action is display(len display is 7)
-        printf("!!!                      Cannot %s record(s)                       !!!\n",action);
-
-    }else if (strlen(action)==6){ // actions with lenght 6 such as delete,search,modify
-        printf("!!!                       Cannot %s record(s)                       !!!\n",action);
-
-    }else if (strlen(action) == 4){// actions with lenght 4 such as sort
-        printf("!!!                        Cannot %s record(s)                        !!!\n",action);
-    }
-    printf("!!!                          No data available                          !!!\n");
-    printf("!!!                                                                     !!!\n");
-    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-     printf("\033[0m"); // Reset text color
 }
 
 /**
@@ -1233,10 +1174,7 @@ int compare_funct_descend(const void *a, const void *b) {
 /**
  * @brief Sorts an array of students based on their average score.
  * 
- * @param order The order to sort by: 1 for ascending, 2 for descending.
- * @param all_stud Pointer to the array of students.
- * @param tot_stud_num Total number of students in the array.
- * @return A string indicating the sort order ("ascending" or "descending"), or NULL if no students to sort.
+ * @param order The order to sort by:  ascending or descending.
  */
 void sort_students(char *order) {
     // Sort the students based on the specified order
@@ -1559,4 +1497,79 @@ void read_students_from_json(struct Student **all_students_array, int *total_stu
 
     // Free the JSON object
     json_object_put(jobj);
+}
+
+/**
+ * @brief Display success  message for operations completed without any error
+ * 
+ * @param mg The message to show to the user
+*/
+void show_success_message(char *msg) {
+    printf("\n\033[1;32m"); // Set text color to green
+    printf("*************************************************************************\n");
+    printf("*                                                                       *\n");
+    printf("*                          SUCCESS:                                     *\n");
+    printf("*                                                                       *\n");
+    printf("%s\n", msg);
+    printf("*                                                                       *\n");
+    printf("*************************************************************************\n");
+    printf("\033[0m"); // Reset text color
+}
+
+/**
+ * @brief Display information  message for operations 
+ * 
+ * @param mg The message to show to the user
+*/
+void show_info_message(char *msg) {
+    printf("\n\033[1;34m"); // Set text color to blue
+    printf("*************************************************************************\n");
+    printf("*                                                                       *\n");
+    printf("*                          INFORMATION:                                 *\n");
+    printf("*                                                                       *\n");
+    printf("%s\n", msg);
+    printf("*                                                                       *\n");
+    printf("*************************************************************************\n");
+    printf("\033[0m"); // Reset text color
+}
+
+/**
+ * @brief Display error message for empty student record
+ * 
+ * If user tries to display,modify,delete or search records and the student array is empty(no record added),
+ * This function tells user that no data exists for the action to be performed.
+ * @param action The action being performed, e.g., display , delete, modify and search.
+*/
+void show_no_data_err(char *action){
+    printf("\n\033[1;31m"); // Set text color to red
+    printf("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("!!!                                                                     !!!\n");
+    printf("!!!                              ERROR:                                 !!!\n");
+    printf("!!!                                                                     !!!\n");
+    if(strlen(action) == 7){// if action is display(len display is 7)
+        printf("!!!                      Cannot %s record(s)                       !!!\n",action);
+
+    }else if (strlen(action)==6){ // actions with lenght 6 such as delete,search,modify
+        printf("!!!                       Cannot %s record(s)                       !!!\n",action);
+
+    }else if (strlen(action) == 4){// actions with lenght 4 such as sort
+        printf("!!!                        Cannot %s record(s)                        !!!\n",action);
+    }
+    printf("!!!                          No data available                          !!!\n");
+    printf("!!!                                                                     !!!\n");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+     printf("\033[0m"); // Reset text color
+}
+
+/**
+ * @brief Displays an error if user is trying to modify,search or delete data and the roll number entered is not available in the student records
+*/
+void show_not_found_err_msg(){
+    char *error_msg;
+    error_msg = "\n!!!                          Invalid input                              !!!"
+                "\n!!!                                                                     !!!"
+                "\n!!!              There is no student with that roll number              !!!"
+                "\n!!!                    Please confirm and try again                     !!!" ;
+    show_error_message(error_msg);
+
 }
