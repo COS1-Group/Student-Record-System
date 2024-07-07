@@ -25,7 +25,7 @@ sudo yum install json-c json-c-devel
 ```
 
 If you are running on Windows, it may be a bit difficult. Reference the json-c repository [here](https://github.com/json-c/json-c) on how you can install the library.
-However, the easiest solution may be to enable Windows subsystem for Linux (WSL) on your Windows PC and install a Linux distro in the WSL.
+However, the easiest solution may be to enable Windows subsystem for Linux (WSL) on your Windows PC and install a Linux distro in the WSL. Then you can use any of the commands above to install the library.
 
 ## Run Program
 
