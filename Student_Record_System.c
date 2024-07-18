@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <ctype.h>
-#include <stdio.h>
 #include <unistd.h>
 #include <json-c/json.h> // needed for the json-c API
 
@@ -12,7 +11,6 @@
 #define MAX_MSG_LEN 256
 #define MIN_STRING_LEN 5 
 #define ART_SIZE 1262
-#define TOTAL_SCORE 100
 #define MAX_COURSES 3
 #define PASS_THRESHOLD 55
 #define TOTAL_SCORE 100
@@ -94,7 +92,7 @@ int main() {
     get_user_name(user_name); // Get the username
     convert_to_upper(user_name);
     char welcome_user_msg[90 + strlen(user_name)]; 
-    sprintf(welcome_user_msg,"          ----< WELCOME ABOARD %s! WHAT WOULD YOU LIKE TO DO? >----                 \n",user_name);
+    sprintf(welcome_user_msg,"          ----< WELCOME ABOARD %s! WHAT WOULD YOU LIKE TO DO? >----                 ",user_name);
     show_header_art(welcome_user_msg);
     bool exit_requested = false;
 
@@ -143,9 +141,12 @@ int main() {
         int do_action_again_response;
         if(!repeat_action("perform another action",&do_action_again_response)){
             free(students); // Free the memory allocated to students after the while loop
-            break; 
+            if (exit_program()){
+                break;
+            } 
         }
     }
+
     return 0;
 }
 
@@ -347,7 +348,7 @@ void show_error_message(char *msg){
     printf("%s", msg);
     printf("\n!!!                                                                     !!!\n");
     printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-     printf("\033[0m"); // Reset text color
+    printf("\033[0m"); // Reset text color
 }
 
 /**
@@ -604,7 +605,7 @@ void add_student(struct Student **students_array, int *student_count) {
     convert_to_upper(new_student->name);
 
     // Prompt and validate student's department
-    snprintf(sen, sizeof(sen), "\n--> Enter %s's department: ", new_student->name);
+    sprintf(sen, "\n--> Enter %s's department: ", new_student->name);
     validate_input_data(sen, new_student->department, STRING, MAX_STRING_LEN, MIN_STRING_LEN);
 
     // Check for duplicate roll number and prompt until unique
@@ -625,7 +626,7 @@ void add_student(struct Student **students_array, int *student_count) {
     }
 
     // Prompt and validate each course name and score
-    sprintf(add_header_msg,"\n                Now, input the courses %s took and their scores                \n              Important: each student must take %d course(s) per session              ",new_student->name,MAX_COURSES);
+    sprintf(add_header_msg,"                Now, input the courses %s took and their scores                \n              Important: each student must take %d course(s) per session              ",new_student->name,MAX_COURSES);
     show_header_art(add_header_msg);
     // printf("\n############ Now, input the courses %s took and their scores: ############\n", new_student->name);
     // printf("!! Important: each student must take %d course(s) per session\n", MAX_COURSES);
@@ -652,7 +653,7 @@ void add_student(struct Student **students_array, int *student_count) {
         }
 
         // Prompt and validate score for the course
-        snprintf(sen, sizeof(sen), "\n--> Enter score for course %d: ", i + 1);
+        snprintf(sen, sizeof(sen), "\n--> Enter %s's score for %s: ", new_student->name, new_student->courses[i]);
         validate_input_data(sen, &new_student->scores[i], SCORE, sizeof(float), 0);
         total_score += new_student->scores[i]; // Accumulate score for average calculation
     }
@@ -668,11 +669,10 @@ void add_student(struct Student **students_array, int *student_count) {
     // Increment student count and save record
     (*student_count)++;
     show_success_message("*             Successfully added the student to the database            *");
-    auto_sort_save();// auto sort and save the records after adding new record(auto save is coming soon!!!!!)
+    auto_sort_save();// auto sort and save the records after adding new record
     if (repeat_action("add another record",&add_again)){
         add_student(students_array,student_count);
     }
-    //auto_sort_save_record(*students_array, *student_count); // Sort and save student records(coming soon...)
 }
 
 
@@ -681,7 +681,7 @@ void add_student(struct Student **students_array, int *student_count) {
  * 
  */
 void display_all_students() {
-    int display_again;
+    // int display_again;
     char *header_msg;
     clear_terminal();
     if (student_count <= 0) {
@@ -711,8 +711,7 @@ void display_all_students() {
  * @param student Pointer to the student structure.
  * @param student_index Index of the student in the array.
  */
-void display_student_info(struct Student *student, int student_index) {
-   
+void display_student_info(struct Student *student, int student_index) {   
     printf("\n================================================================================\n");
     printf("                          STUDENT %d: %s                          \n", student_index + 1, student->name);
     printf("================================================================================\n");
@@ -755,9 +754,9 @@ int search_by_roll(char *purpose) {
         validate_input_data(prompt, &roll_num_to_search, INTEGER, 0, 0);
 
         printf("\n<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
-        printf("\n<<                                                                     <<");
-        printf("\n<<        Please wait while I query the database for you               <<");
-        printf("\n<<                                                                     <<");
+        printf("\n<<                                                                      <<");
+        printf("\n<<        Please wait while I query the database for you                <<");
+        printf("\n<<                                                                      <<");
         printf("\n<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
 
         // Simulate querying delay with visual feedback
@@ -820,8 +819,9 @@ void search_student_by_roll_num() {
 void modify_student_data() {
     char *error_msg,*header_msg;
     int update_options[] = {1,2,3,4,5,6};
-    int modify_again;
+    int modify_again, old_roll;
     bool modification_completed = false;
+    char *old_name,prompt[MAX_MSG_LEN];
 
     header_msg = "@@                 ----< MODIFYING A STUDENT'S RECORD >----                       @@";
     clear_terminal();
@@ -832,6 +832,7 @@ void modify_student_data() {
         int student_index = search_by_roll("modify");
         if (student_index != -1) {
             struct Student *student = &(students[student_index]);
+            
             // Display student information
             display_student_info(student,student_index);
 
@@ -857,17 +858,23 @@ void modify_student_data() {
             // Update based on user choice
             switch (choice) {
                 case 1:
-                    validate_input_data("\n--> Enter new name: ",student->name,STRING,MAX_STRING_LEN,MIN_STRING_LEN);
+                    old_name = student->name;
+                    sprintf(prompt,"\n--> Enter new name (old name for the student is  %s): ",old_name);
+                    validate_input_data(prompt,student->name,STRING,MAX_STRING_LEN,MIN_STRING_LEN);
                     modification_completed = true;
                     break;
                 case 2:
-                    validate_input_data("\n--> Enter new department: ",student->department,STRING,MAX_STRING_LEN,MIN_STRING_LEN);
+                    old_name = student->department;
+                    sprintf(prompt,"\n--> Enter new department (student's old department is %s): ",old_name);
+                    validate_input_data(prompt,student->department,STRING,MAX_STRING_LEN,MIN_STRING_LEN);
                     modification_completed = true;
                     break;
                 case 3: {
                     int new_roll;
+                    old_roll = student->roll_number;
+                    sprintf(prompt,"\n--> Enter new roll number (stident's old roll number is %d): ",old_roll);
                     while (true) {
-                        validate_input_data("\n--> Enter new roll number: ",&new_roll,INTEGER,0,0);
+                        validate_input_data(prompt,&new_roll,INTEGER,0,0);
                         if (!is_duplicate_roll_num( new_roll)) {
                             student->roll_number = new_roll;
                             modification_completed = true;
@@ -907,8 +914,6 @@ void modify_student_data() {
             if (repeat_action("modify a record again",&modify_again)){
                 modify_student_data();
             }
-        }else {
-            show_not_found_err_msg(); //the student whose roll number was entered is not in the database
         }
     }else {
         show_no_data_err("modify");
@@ -930,12 +935,12 @@ void update_course(struct Student *student, bool update_name,bool *modification_
     char prompt[MAX_MSG_LEN];
 
     // Display courses and their scores
-    header_msg = "@@                  ----< SELECT THE COURSE TO UPDATE >----                        @@\n";
+    header_msg = "@@                  ----< SELECT THE COURSE TO UPDATE >----                       @@";
     clear_terminal();
+    show_header_art(header_msg);
     printf("\n====================================================================================\n");
     printf("                                 COURSES AND SCORES                                  \n");
     printf("-------------------------------------------------------------------------------------\n");
-    show_header_art(header_msg);
     printf("\n");
     for (int j = 0; j < MAX_COURSES + 1; j++) {
         course_options[j] = j + 1; //add values to the course options array depending on the total max course and 1 is added for an additional option for Exit
@@ -945,6 +950,7 @@ void update_course(struct Student *student, bool update_name,bool *modification_
         }
     }
     printf("%-25c %d. %-15s",' ',MAX_COURSES + 1,"Exit"); // show exit option
+    printf("\n");
     
     validate_input_choices( "\n--> Please type a number to select an option from above: ",INTEGER,course_options,&course_num,sizeof(course_options)/sizeof(course_options[0]));
     course_num--;  // Convert to 0-based index
@@ -953,13 +959,13 @@ void update_course(struct Student *student, bool update_name,bool *modification_
     if (course_num < MAX_COURSES){ // The user entered a number equal to the options of courses 
         // if the course option array is {1,2,3,4}, options 1 to 3 represents courses and option 4 represents exit option
         if (update_name) {
-        header_msg = "@@                     ----<  UPDATING COURSE NAME  >----                          @@";
+        header_msg = "@@                     ----<  UPDATING COURSE NAME  >----                        @@";
         show_header_art(header_msg);
         sprintf(prompt,"\n--> Enter new course name (old name is %s): ",student->courses[course_num]);
         validate_input_data(prompt,student->courses[course_num],STRING,MAX_STRING_LEN,MIN_STRING_LEN);
         *modification_completed = true;
         } else {
-            header_msg = "@@                  ----<   UPDATING THE COURSE SCORE  >----                       @@";
+            header_msg = "@@                  ----<   UPDATING THE COURSE SCORE  >----                      @@";
             show_header_art(header_msg);
             sprintf(prompt,"\n--> Enter new course name (old score for the course %s is %.2f): ",student->courses[course_num],student->scores[course_num]);
             validate_input_data(prompt,&student->scores[course_num],SCORE,sizeof(float),0);
