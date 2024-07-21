@@ -101,6 +101,7 @@ int main() {
         int selected_operation = get_main_program_choice();
         // printf("Selected option %d\n", selected_operation);
         greet_user = false;
+        
         switch (selected_operation)
         {
             case 1:
@@ -129,20 +130,23 @@ int main() {
                 break;
             case 9:
                 exit_requested = exit_program();
-                if (exit_requested){
-                    free(students);
-                    exit(0);
-                }
+                // if (exit_requested){
+                //     free(students);
+                //     exit(0);
+                // }
                 break;
             default:
                 break;
         }
-
+        
         int do_action_again_response;
-        if(!repeat_action("perform another action",&do_action_again_response)){
-            free(students); // Free the memory allocated to students after the while loop
+        if (exit_requested){
+            free(students); // Free the memory allocated to students
+            break;//exit the program
+        }else if(!repeat_action("perform another action",&do_action_again_response)){
             if (exit_program()){
-                break;
+                free(students); // Free the memory allocated to students
+                break;//exit the program
             } 
         }
     }
@@ -162,6 +166,7 @@ bool exit_program() {
     int response;
 
     header_msg = "@@                       ----<  EXIT THE ENTIRE PROGRAM  >----                    @@";
+    clear_terminal();
     show_header_art(header_msg);  
 
     prompt = "\n--> Ensure you have saved your progress before exiting.\n--> Proceed to exit? Y/N: ";
@@ -581,6 +586,8 @@ void add_student(struct Student **students_array, int *student_count) {
     char sen[MAX_STRING_LEN + 50];   // Buffer for constructing prompts
     char *error_msg;
     int add_again;
+    char firstname[MAX_STRING_LEN], lastname[MAX_STRING_LEN];
+     char fullname[MAX_STRING_LEN * 2];
 
     // Allocate or reallocate memory for students_array array
     if (*student_count == 0) {
@@ -601,7 +608,13 @@ void add_student(struct Student **students_array, int *student_count) {
     // Prompt and validate student's name
     sprintf(add_header_msg,"@@                  ----< ADDING STUDENT %d TO THE DATABASE >----                  @@",*student_count + 1);
     show_header_art(add_header_msg);
-    validate_input_data("\n--> Enter student's name: ", new_student->name, STRING, MAX_STRING_LEN, MIN_STRING_LEN);
+
+    validate_input_data("\n--> Enter student's first name: ", firstname, STRING, MAX_STRING_LEN, MIN_STRING_LEN);
+    validate_input_data("\n--> Enter student's last name: ", lastname, STRING, MAX_STRING_LEN, MIN_STRING_LEN);
+    
+    // Combine first name and last name with a space in between
+    sprintf(fullname, "%s %s", firstname, lastname);
+    strcpy(new_student->name, fullname);
     convert_to_upper(new_student->name);
 
     // Prompt and validate student's department
@@ -611,7 +624,7 @@ void add_student(struct Student **students_array, int *student_count) {
     // Check for duplicate roll number and prompt until unique
     while (true) {
 
-        snprintf(sen, sizeof(sen), "\n--> Enter %s's roll number: ", new_student->name);
+        sprintf(sen,"\n--> Enter %s's roll number: ", new_student->name);
         validate_input_data(sen, &new_student->roll_number, INTEGER, sizeof(int), 0);
         duplicate_roll = is_duplicate_roll_num(new_student->roll_number);
         if (!duplicate_roll) {
@@ -817,65 +830,81 @@ void search_student_by_roll_num() {
  * Then user can modify whatever they want
  */
 void modify_student_data() {
-    char *error_msg,*header_msg;
-    int update_options[] = {1,2,3,4,5,6};
+    char *error_msg, *header_msg;
+    int update_options[] = {1, 2, 3, 4, 5, 6};
     int modify_again, old_roll;
     bool modification_completed = false;
-    char *old_name,prompt[MAX_MSG_LEN];
+    char prompt[MAX_MSG_LEN];
 
     header_msg = "@@                 ----< MODIFYING A STUDENT'S RECORD >----                       @@";
     clear_terminal();
     show_header_art(header_msg);
-    
-    if (student_count > 0){
-            // Find student by roll number
+
+    if (student_count > 0) {
+        // Find student by roll number
         int student_index = search_by_roll("modify");
         if (student_index != -1) {
             struct Student *student = &(students[student_index]);
-            
+
             // Display student information
-            display_student_info(student,student_index);
+            display_student_info(student, student_index);
 
             // Get user choice for modification
             int choice;
             char option_art[ART_SIZE];
-            
+
             sprintf(option_art,
-            "\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n"
-            "@@                                                                                @@\n"
-            "@@                            SELECT WHAT TO UPDATE                               @@\n"
-            "@@                            ---------------------                               @@\n"
-            "@@                            1. Student's name                                   @@\n"
-            "@@                            2. Student's department                             @@\n"
-            "@@                            3. Student's roll number                            @@\n"
-            "@@                            4. Course name                                      @@\n"
-            "@@                            5. Course score                                     @@\n"
-            "@@                            6. Exit                                             @@\n"
-            "@@                                                                                @@\n"
-            "           --> Please type a number to select an option from above: ");
-            validate_input_choices(option_art,INTEGER,update_options,&choice,sizeof(update_options)/sizeof(update_options[0]));
+                    "\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n"
+                    "@@                                                                                @@\n"
+                    "@@                            SELECT WHAT TO UPDATE                               @@\n"
+                    "@@                            ---------------------                               @@\n"
+                    "@@                            1. Student's first name                             @@\n"
+                    "@@                            2. Student's last name                              @@\n"
+                    "@@                            3. Student's department                             @@\n"
+                    "@@                            4. Student's roll number                            @@\n"
+                    "@@                            5. Course name                                      @@\n"
+                    "@@                            6. Course score                                     @@\n"
+                    "@@                            7. Exit                                             @@\n"
+                    "@@                                                                                @@\n"
+                    "           --> Please type a number to select an option from above: ");
+            validate_input_choices(option_art, INTEGER, update_options, &choice, sizeof(update_options) / sizeof(update_options[0]));
 
             // Update based on user choice
             switch (choice) {
-                case 1:
-                    old_name = student->name;
-                    sprintf(prompt,"\n--> Enter new name (old name for the student is  %s): ",old_name);
-                    validate_input_data(prompt,student->name,STRING,MAX_STRING_LEN,MIN_STRING_LEN);
+                case 1: {
+                    char firstname[MAX_STRING_LEN],lastname[MAX_STRING_LEN];
+                    sprintf(prompt, "\n--> Enter new first name (old first name for the student is %s): ", strtok(student->name, " "));
+                    strcpy(lastname, strtok(NULL, " "));
+                    printf("%s",lastname);
+                    validate_input_data(prompt, firstname, STRING, MAX_STRING_LEN, MIN_STRING_LEN);
+                    sprintf(student->name, "%s %s", firstname, lastname);
+                    convert_to_upper(student->name);
                     modification_completed = true;
                     break;
-                case 2:
-                    old_name = student->department;
-                    sprintf(prompt,"\n--> Enter new department (student's old department is %s): ",old_name);
-                    validate_input_data(prompt,student->department,STRING,MAX_STRING_LEN,MIN_STRING_LEN);
+                }
+                case 2: {
+                    char lastname[MAX_STRING_LEN],firstname[MAX_STRING_LEN];
+                    strcpy(firstname, strtok(student->name, " "));
+                    sprintf(prompt, "\n--> Enter new last name (old last name for the student is %s): ", strtok(NULL, " "));
+                    validate_input_data(prompt, lastname, STRING, MAX_STRING_LEN, MIN_STRING_LEN);
+                    sprintf(student->name, "%s %s", firstname, lastname);
+                    convert_to_upper(student->name);
                     modification_completed = true;
                     break;
-                case 3: {
+                }
+                case 3:
+                    // old_name = student->department;
+                    sprintf(prompt, "\n--> Enter new department (student's old department is %s): ", student->department);
+                    validate_input_data(prompt, student->department, STRING, MAX_STRING_LEN, MIN_STRING_LEN);
+                    modification_completed = true;
+                    break;
+                case 4: {
                     int new_roll;
                     old_roll = student->roll_number;
-                    sprintf(prompt,"\n--> Enter new roll number (stident's old roll number is %d): ",old_roll);
+                    sprintf(prompt, "\n--> Enter new roll number (student's old roll number is %d): ", old_roll);
                     while (true) {
-                        validate_input_data(prompt,&new_roll,INTEGER,0,0);
-                        if (!is_duplicate_roll_num( new_roll)) {
+                        validate_input_data(prompt, &new_roll, INTEGER, 0, 0);
+                        if (!is_duplicate_roll_num(new_roll)) {
                             student->roll_number = new_roll;
                             modification_completed = true;
                             break;
@@ -889,17 +918,15 @@ void modify_student_data() {
                     }
                     break;
                 }
-                case 4:
-                    update_course(student, true,&modification_completed);//modify the name of a course
-                    //modification_completed = true;
-                    break;
                 case 5:
-                    update_course(student, false,&modification_completed);//modify the score of a course
-                    // modification_completed = true;
+                    update_course(student, true, &modification_completed); // modify the name of a course
                     break;
                 case 6:
+                    update_course(student, false, &modification_completed); // modify the score of a course
+                    break;
+                case 7:
                     modification_completed = false;
-                    if (exit_program()){
+                    if (exit_program()) {
                         exit(0);
                     }
                     break;
@@ -907,18 +934,17 @@ void modify_student_data() {
                     printf("Invalid choice!\n");
                     break;
             }
-            if (modification_completed){
+            if (modification_completed) {
                 show_success_message("*               Successfully updated the student's record               *");
-                auto_sort_save();// auto sort and save the records after modifying score(s) of the course(s) of a student's record(auto save is coming soon!!!!!)
+                auto_sort_save(); // auto sort and save the records after modifying score(s) of the course(s) of a student's record
             }
-            if (repeat_action("modify a record again",&modify_again)){
+            if (repeat_action("modify a record again", &modify_again)) {
                 modify_student_data();
             }
         }
-    }else {
+    } else {
         show_no_data_err("modify");
     }
-    
 }
 
 /**
@@ -1509,6 +1535,9 @@ void read_students_from_json(struct Student **all_students_array, int *total_stu
         }
     }
 
+    char msg[MAX_MSG_LEN];
+    sprintf(msg,"   Student records successfully read from the file %s", read_json_filename);
+    show_success_message(msg);
     // Assign the parsed students to the main array
     free(*all_students_array); // Free existing students array
     *all_students_array = parsed_students; // Assign parsed students array
@@ -1527,7 +1556,7 @@ void show_success_message(char *msg) {
     printf("\n\033[1;32m"); // Set text color to green
     printf("*************************************************************************\n");
     printf("*                                                                       *\n");
-    printf("*                          SUCCESS:                                     *\n");
+    printf("*                                 SUCCESS:                              *\n");
     printf("*                                                                       *\n");
     printf("%s\n", msg);
     printf("*                                                                       *\n");
@@ -1544,7 +1573,7 @@ void show_info_message(char *msg) {
     printf("\n\033[1;34m"); // Set text color to blue
     printf("*************************************************************************\n");
     printf("*                                                                       *\n");
-    printf("*                          INFORMATION:                                 *\n");
+    printf("*                            INFORMATION:                               *\n");
     printf("*                                                                       *\n");
     printf("%s\n", msg);
     printf("*                                                                       *\n");
